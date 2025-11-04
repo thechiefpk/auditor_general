@@ -1,5 +1,6 @@
 using ComplianceSecurityAuditor.Library;
 using ComplianceSecurityAuditor.Models;
+using ComplianceSecurityAuditor.Server;
 
 namespace ComplianceSecurityAuditor.Services
 {
@@ -7,12 +8,15 @@ namespace ComplianceSecurityAuditor.Services
     {
         private readonly FileScanner _fileScanner;
         private readonly ValidationEngine _validationEngine;
+        private readonly ISqlReportRepository _repo;
 
-        public ComplianceService()
+        // new ctor with optional repo
+        public ComplianceService(ISqlReportRepository repo = null)
         {
             _fileScanner = new FileScanner();
             var rules = RuleRegistry.GetRules();
             _validationEngine = new ValidationEngine(rules);
+            _repo = repo;
         }
 
         public ScanSummary Scan(string path)
@@ -26,12 +30,41 @@ namespace ComplianceSecurityAuditor.Services
                 allViolations.AddRange(violations);
             }
 
-            return new ScanSummary
+            var summary = new ScanSummary
             {
                 FilesScanned = files.Count,
                 ViolationsFound = allViolations.Count,
                 Violations = allViolations
             };
+
+            // Auto-save if repository is configured
+            if (_repo != null)
+            {
+                try
+                {
+                    var id = _repo.SaveReport(path, summary);
+                    summary.ReportId = id;
+                }
+                catch
+                {
+                    // swallow DB errors to not break scan. Consider logging in real app.
+                }
+            }
+
+            return summary;
+        }
+
+        public Guid ScanAndSave(string path)
+        {
+            var summary = Scan(path);
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return _repo.SaveReport(path, summary);
+        }
+
+        public ScanStatistics GetStatistics(Guid reportId)
+        {
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return _repo.GetStatistics(reportId);
         }
     }
 }

@@ -1,6 +1,13 @@
+using System;
+using System.IO;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using ComplianceSecurityAuditor.Library;
+using ComplianceSecurityAuditor.Models;
+using ComplianceSecurityAuditor.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ComplianceAuditor.Controllers
+namespace ComplianceSecurityAuditor.Controllers
 {
     [ApiController]
     [Route("api")]
@@ -13,42 +20,36 @@ namespace ComplianceAuditor.Controllers
             _complianceService = complianceService;
         }
 
-        [HttpPost("scan")]
+        [HttpPost("scanbyjson")]
         [Consumes("application/json")]
-		public IActionResult ScanJson([FromBody] ScanRequest request)
+        public IActionResult ScanJson([FromBody] ScanRequest request)
         {
             if (request is null || string.IsNullOrWhiteSpace(request.Path))
                 return BadRequest(new { error = "Request body must contain a non-empty 'path' field." });
 
-            var path = NormalizePath(request.Path, out var normalizeError);
+            var path = Utility.NormalizePath(request.Path, out var normalizeError);
             if (normalizeError is not null)
                 return BadRequest(new { error = normalizeError });
 
             if (!Directory.Exists(path) && !System.IO.File.Exists(path))
                 return BadRequest(new { error = "Path does not exist.", path });
 
+            // ComplianceService.Scan will now auto-save the report when a repository is configured.
             var summary = _complianceService.Scan(path);
             return Ok(summary);
         }
 
-        private static string NormalizePath(string raw, out string? error)
+        [HttpGet("stats/{id}")]
+        public IActionResult GetStats(Guid id)
         {
-            error = null;
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                error = "Path is empty.";
-                return string.Empty;
-            }
-
             try
             {
-                // GetFullPath will resolve relative paths and will throw on invalid characters.
-                return Path.GetFullPath(raw);
+                var stats = _complianceService.GetStatistics(id);
+                return Ok(stats);
             }
-            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException)
+            catch (InvalidOperationException ex)
             {
-                error = $"Provided path is invalid: {ex.Message}";
-                return string.Empty;
+                return StatusCode(500, new { error = ex.Message });
             }
         }
     }

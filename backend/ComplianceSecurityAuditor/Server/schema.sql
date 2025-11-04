@@ -1,0 +1,23 @@
+-- SQL Server schema for scan reports
+
+CREATE TABLE Reports (
+ Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+ Path NVARCHAR(1024) NOT NULL,
+ FilesScanned INT NOT NULL,
+ ViolationsFound INT NOT NULL,
+ CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE Violations (
+ Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+ ReportId UNIQUEIDENTIFIER NOT NULL FOREIGN KEY REFERENCES Reports(Id) ON DELETE CASCADE,
+ FilePath NVARCHAR(1024) NOT NULL,
+ LineNumber INT NOT NULL,
+ MatchedText NVARCHAR(MAX) NULL,
+ RuleId NVARCHAR(50) NOT NULL,
+ RuleName NVARCHAR(200) NOT NULL,
+ Category NVARCHAR(100) NOT NULL
+);
+
+-- Index to speed up category aggregations
+CREATE INDEX IX_Violations_ReportId_Category ON Violations (ReportId, Category);
