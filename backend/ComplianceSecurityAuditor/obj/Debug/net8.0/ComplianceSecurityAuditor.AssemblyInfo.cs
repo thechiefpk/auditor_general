@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ComplianceSecurityAuditor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+63f90dfbb8ed256adbe64b5d619c7a0e75f58ad1")]
 [assembly: System.Reflection.AssemblyProductAttribute("ComplianceSecurityAuditor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ComplianceSecurityAuditor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
