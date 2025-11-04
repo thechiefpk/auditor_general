@@ -1,0 +1,178 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|c:\\users\\prince\\desktop\\btc\\sem 7 feb 2026\\compliance_auditor\\backend\\compliancesecurityauditor\\services\\complianceservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|solutionrelative:compliancesecurityauditor\\services\\complianceservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|c:\\users\\prince\\desktop\\btc\\sem 7 feb 2026\\compliance_auditor\\backend\\compliancesecurityauditor\\library\\validationengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|solutionrelative:compliancesecurityauditor\\library\\validationengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|c:\\users\\prince\\desktop\\btc\\sem 7 feb 2026\\compliance_auditor\\backend\\compliancesecurityauditor\\models\\violation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|solutionrelative:compliancesecurityauditor\\models\\violation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|c:\\users\\prince\\desktop\\btc\\sem 7 feb 2026\\compliance_auditor\\backend\\compliancesecurityauditor\\library\\filescanner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|solutionrelative:compliancesecurityauditor\\library\\filescanner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|c:\\users\\prince\\desktop\\btc\\sem 7 feb 2026\\compliance_auditor\\backend\\compliancesecurityauditor\\controllers\\scancontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|solutionrelative:compliancesecurityauditor\\controllers\\scancontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|c:\\users\\prince\\desktop\\btc\\sem 7 feb 2026\\compliance_auditor\\backend\\compliancesecurityauditor\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F6390B53-2FF2-43D8-9A62-949DA47C50ED}|ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj|solutionrelative:compliancesecurityauditor\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 3,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{d212f56b-c48a-434c-a121-1c5d80b59b9f}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Program.cs",
+              "RelativeDocumentMoniker": "ComplianceSecurityAuditor\\Program.cs",
+              "ToolTip": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Program.cs",
+              "RelativeToolTip": "ComplianceSecurityAuditor\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAnAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-02T14:12:44.491Z",
+              "IsPinned": true,
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ScanController.cs",
+              "DocumentMoniker": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Controllers\\ScanController.cs",
+              "RelativeDocumentMoniker": "ComplianceSecurityAuditor\\Controllers\\ScanController.cs",
+              "ToolTip": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Controllers\\ScanController.cs",
+              "RelativeToolTip": "ComplianceSecurityAuditor\\Controllers\\ScanController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-02T14:12:57.381Z",
+              "IsPinned": true,
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ComplianceService.cs",
+              "DocumentMoniker": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Services\\ComplianceService.cs",
+              "RelativeDocumentMoniker": "ComplianceSecurityAuditor\\Services\\ComplianceService.cs",
+              "ToolTip": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Services\\ComplianceService.cs",
+              "RelativeToolTip": "ComplianceSecurityAuditor\\Services\\ComplianceService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-02T14:31:27.336Z",
+              "IsPinned": true,
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ValidationEngine.cs",
+              "DocumentMoniker": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Library\\ValidationEngine.cs",
+              "RelativeDocumentMoniker": "ComplianceSecurityAuditor\\Library\\ValidationEngine.cs",
+              "ToolTip": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Library\\ValidationEngine.cs",
+              "RelativeToolTip": "ComplianceSecurityAuditor\\Library\\ValidationEngine.cs",
+              "ViewState": "AgIAABQAAAAAAAAAAADwvycAAABnAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-02T17:18:09.591Z",
+              "IsPinned": true,
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Violation.cs",
+              "DocumentMoniker": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Models\\Violation.cs",
+              "RelativeDocumentMoniker": "ComplianceSecurityAuditor\\Models\\Violation.cs",
+              "ToolTip": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Models\\Violation.cs",
+              "RelativeToolTip": "ComplianceSecurityAuditor\\Models\\Violation.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAABUAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-04T16:49:03.621Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "FileScanner.cs",
+              "DocumentMoniker": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Library\\FileScanner.cs",
+              "RelativeDocumentMoniker": "ComplianceSecurityAuditor\\Library\\FileScanner.cs",
+              "ToolTip": "C:\\Users\\Prince\\Desktop\\BTC\\SEM 7 Feb 2026\\Compliance_Auditor\\backend\\ComplianceSecurityAuditor\\Library\\FileScanner.cs",
+              "RelativeToolTip": "ComplianceSecurityAuditor\\Library\\FileScanner.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAADwvxMAAAAGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-04T16:44:00.294Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:130:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:133:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:132:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:131:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:130:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

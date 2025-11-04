@@ -1,0 +1,46 @@
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\appsettings.Development.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\appsettings.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\ComplianceSecurityAuditor.staticwebassets.endpoints.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\ComplianceSecurityAuditor.exe
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\ComplianceSecurityAuditor.deps.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\ComplianceSecurityAuditor.runtimeconfig.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\ComplianceSecurityAuditor.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\ComplianceSecurityAuditor.pdb
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\Microsoft.OpenApi.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.csproj.AssemblyReference.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\rpswa.dswa.cache.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.AssemblyInfoInputs.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.AssemblyInfo.cs
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.csproj.CoreCompileInputs.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\rjimswa.dswa.cache.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\scopedcss\bundle\ComplianceSecurityAuditor.styles.css
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\staticwebassets.build.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\staticwebassets.build.json.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\staticwebassets.development.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\staticwebassets.build.endpoints.json
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\Complian.FCE9123C.Up2Date
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\refint\ComplianceSecurityAuditor.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.pdb
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.genruntimeconfig.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ref\ComplianceSecurityAuditor.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 -- Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.csproj.AssemblyReference.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\rpswa.dswa.cache.json
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.AssemblyInfoInputs.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.AssemblyInfo.cs
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.csproj.CoreCompileInputs.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\refint\ComplianceSecurityAuditor.dll
+C:\Users\Prince\Desktop\BTC\SEM 7 Feb 2026\Compliance_Auditor\backend\ComplianceSecurityAuditor\obj\Debug\net8.0\ComplianceSecurityAuditor.pdb
