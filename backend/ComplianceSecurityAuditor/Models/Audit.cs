@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using System.Text.Json.Serialization;
 
 namespace ComplianceSecurityAuditor.Models
 {
@@ -12,7 +13,7 @@ namespace ComplianceSecurityAuditor.Models
 			string Name,
 			string Category, // e.g., "GDPR", "HIPAA", "Security"
 			string Description,
-			Regex Pattern
+			[property: JsonIgnore] Regex Pattern
 		);
 	}
 }

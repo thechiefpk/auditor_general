@@ -1,6 +1,6 @@
 using ComplianceSecurityAuditor.Library;
 using ComplianceSecurityAuditor.Models;
-using ComplianceSecurityAuditor.Server;
+using ComplianceSecurityAuditor.Data;
 
 namespace ComplianceSecurityAuditor.Services
 {
@@ -10,7 +10,39 @@ namespace ComplianceSecurityAuditor.Services
         private readonly ValidationEngine _validationEngine;
         private readonly ISqlReportRepository _repo;
 
-        // new ctor with optional repo
+        // Files and patterns to ignore during scanning
+        private readonly HashSet<string> _ignoredFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".gitignore",
+            ".git",
+            ".vs",
+            ".idea",
+            "node_modules"
+        };
+
+        private readonly HashSet<string> _ignoredExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".db",
+            ".sqlite",
+            ".lock",
+            ".log",
+            ".DB",
+            ".dbmdl",
+            ".sqlproj",
+            ".sln"
+        };
+
+        private readonly List<string> _ignoredPathPatterns = new List<string>
+        {
+            "\\.vs\\",
+            "\\node_modules\\",
+            "\\bin\\",
+            "\\obj\\",
+            "\\.git\\",
+            "CopilotIndices",
+            "CodeChunks"
+        };
+
         public ComplianceService(ISqlReportRepository repo = null)
         {
             _fileScanner = new FileScanner();
@@ -19,10 +51,36 @@ namespace ComplianceSecurityAuditor.Services
             _repo = repo;
         }
 
-        public ScanSummary Scan(string path)
+        private bool ShouldIgnoreFile(string filePath)
+        {
+            var fileName = Path.GetFileName(filePath);
+            var extension = Path.GetExtension(filePath);
+
+            // Check if filename should be ignored
+            if (_ignoredFileNames.Contains(fileName))
+                return true;
+
+            // Check if extension should be ignored
+            if (_ignoredExtensions.Contains(extension))
+                return true;
+
+            // Check if path contains ignored patterns
+            foreach (var pattern in _ignoredPathPatterns)
+            {
+                if (filePath.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public ScanSummary Scan(Guid userid, string path)
         {
             var allViolations = new List<Violation>();
-            var files = _fileScanner.FindFiles(path).ToList();
+            var allFiles = _fileScanner.FindFiles(path).ToList();
+
+            // Filter out ignored files
+            var files = allFiles.Where(f => !ShouldIgnoreFile(f)).ToList();
 
             foreach (var file in files)
             {
@@ -37,34 +95,61 @@ namespace ComplianceSecurityAuditor.Services
                 Violations = allViolations
             };
 
-            // Auto-save if repository is configured
             if (_repo != null)
             {
                 try
                 {
-                    var id = _repo.SaveReport(path, summary);
-                    summary.ReportId = id;
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var id = await _repo.SaveReportAsync(userid, path, summary);
+                            summary.ReportId = id;
+                        }
+                        catch { }
+                    });
                 }
-                catch
-                {
-                    // swallow DB errors to not break scan. Consider logging in real app.
-                }
+                catch { }
             }
 
             return summary;
         }
 
-        public Guid ScanAndSave(string path)
+        public async Task<Guid> ScanAndSaveAsync(Guid userid, string path)
         {
-            var summary = Scan(path);
+            var summary = Scan(userid, path);
             if (_repo == null) throw new InvalidOperationException("Repository not configured.");
-            return _repo.SaveReport(path, summary);
+            return await _repo.SaveReportAsync(userid, path, summary);
         }
 
-        public ScanStatistics GetStatistics(Guid reportId)
+        public async Task<ScanStatistics> GetStatisticsAsync(Guid reportId)
         {
             if (_repo == null) throw new InvalidOperationException("Repository not configured.");
-            return _repo.GetStatistics(reportId);
+            return await _repo.GetStatisticsAsync(reportId);
+        }
+
+        public async Task<ScanSummary> GetReportAsync(Guid reportId)
+        {
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return await _repo.GetReportAsync(reportId);
+        }
+
+        public async Task<PagedResult<Violation>> GetReportViolationsPagedAsync(Guid reportId, int page, int pageSize, string? category = null, string? q = null, string sortBy = "filePath", string sortDir = "asc")
+        {
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return await _repo.GetViolationsPagedAsync(reportId, page, pageSize, category, q, sortBy, sortDir);
+        }
+
+        public async Task<List<TopFile>> GetTopFilesAsync(Guid reportId, int limit = 10)
+        {
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return await _repo.GetTopFilesAsync(reportId, limit);
+        }
+
+        public async Task<List<ScanSummary>> GetReportsByUserAsync(Guid userId)
+        {
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return await _repo.GetReportsByUserAsync(userId);
         }
     }
 }

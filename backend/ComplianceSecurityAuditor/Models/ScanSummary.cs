@@ -4,6 +4,8 @@ namespace ComplianceSecurityAuditor.Models
     {
         public int FilesScanned { get; set; }
         public int ViolationsFound { get; set; }
+        public string? RepositoryUrl { get; set; }
+        public string? Branch { get; set; }
         public List<Violation> Violations { get; set; }
         // When saved to DB, this will contain the report id; null if not saved.
         public Guid? ReportId { get; set; }

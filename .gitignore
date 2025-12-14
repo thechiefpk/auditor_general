@@ -1,0 +1,11 @@
+backend/.vs/ComplianceSecurityAuditor/FileContentIndex/96f395ed-b3f4-4374-99e3-7fe9714465ab.vsidx
+
+# Visual Studio
+.vs/
+**/.vs/
+*.suo
+*.user
+
+
+backend/.vs/
+

@@ -1,11 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "eCYsjVtRsKQ=",
+  "dgSpecHash": "phQcTyHtEzU=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Prince\\Desktop\\BTC\\SEM_7_Feb_2026\\auditor_general\\backend\\ComplianceSecurityAuditor\\ComplianceSecurityAuditor.csproj",
+  "projectFilePath": "C:\\Users\\Prince\\Desktop\\BTC\\SEM_7_Feb_2026\\auditor_general\\backend\\ComplianceSecurityAuditor\\SecureSoftAPI.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Prince\\.nuget\\packages\\azure.core\\1.47.1\\azure.core.1.47.1.nupkg.sha512",
     "C:\\Users\\Prince\\.nuget\\packages\\azure.identity\\1.14.2\\azure.identity.1.14.2.nupkg.sha512",
+    "C:\\Users\\Prince\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\8.0.0\\microsoft.aspnetcore.authentication.jwtbearer.8.0.0.nupkg.sha512",
     "C:\\Users\\Prince\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\8.0.0\\microsoft.bcl.asyncinterfaces.8.0.0.nupkg.sha512",
     "C:\\Users\\Prince\\.nuget\\packages\\microsoft.bcl.cryptography\\8.0.0\\microsoft.bcl.cryptography.8.0.0.nupkg.sha512",
     "C:\\Users\\Prince\\.nuget\\packages\\microsoft.data.sqlclient\\6.1.2\\microsoft.data.sqlclient.6.1.2.nupkg.sha512",
