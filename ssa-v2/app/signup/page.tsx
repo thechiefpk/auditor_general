@@ -51,7 +51,7 @@ export default function SignupPage() {
         </div>
 
         <div className="text-center max-w-md px-6 translate-x-[20px]">
-          <h2 className="font-bold tracking-tight text-white mb-3">Enterprise Security Audit</h2>
+          <h2 className="font-bold tracking-tight text-white mb-3">Enterprise Compliance Audit</h2>
           <p className="text-zinc-400 text-sm leading-relaxed">
             Comprehensive compliance monitoring and automated security assessments for your entire infrastructure.
           </p>
