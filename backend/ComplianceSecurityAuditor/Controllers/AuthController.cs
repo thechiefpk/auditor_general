@@ -2,6 +2,7 @@ using ComplianceSecurityAuditor.Models;
 using ComplianceSecurityAuditor.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace ComplianceSecurityAuditor.Controllers
 {
@@ -68,5 +69,30 @@ namespace ComplianceSecurityAuditor.Controllers
 			var ok = await _auth.RevokeAsync(req.RefreshToken, HttpContext.Connection.RemoteIpAddress?.ToString());
 			return Ok(new { revoked = ok });
 		}
+
+		[HttpGet("profile")]
+		[Authorize]
+		public async Task<IActionResult> GetProfile()
+		{
+			var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+			if (!Guid.TryParse(idStr, out var id)) return Unauthorized();
+			var user = await _auth.GetUserByIdAsync(id);
+			if (user == null) return NotFound();
+			return Ok(user);
+		}
+
+		[HttpPut("profile")]
+		[Authorize]
+		public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest req)
+		{
+			var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+			if (!Guid.TryParse(idStr, out var id)) return Unauthorized();
+			if (req == null) return BadRequest();
+			var ok = await _auth.UpdateUserAsync(id, req.Username, req.Email, req.NewPassword);
+			if (!ok) return BadRequest(new { error = "Update failed" });
+			return Ok(new { success = true });
+		}
 	}
+
+	public class UpdateProfileRequest { public string Username { get; set; } = ""; public string Email { get; set; } = ""; public string? NewPassword { get; set; } }
 }

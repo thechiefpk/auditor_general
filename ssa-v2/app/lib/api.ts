@@ -5,6 +5,7 @@ export const API_ENDPOINTS = {
   // Auth endpoints
   LOGIN: `${API_BASE_URL}/api/auth/login`,
   REGISTER: `${API_BASE_URL}/api/auth/register`,
+  PROFILE: `${API_BASE_URL}/api/auth/profile`,
   
   // Scan endpoints
   SCAN: `${API_BASE_URL}/api/scan`,
@@ -42,7 +43,26 @@ export const apiRequest = async <T = any>(
       credentials: 'omit',
     });
 
-    const data = await response.json();
+    // Check if response has content before parsing JSON
+    const contentType = response.headers.get('content-type');
+    let data: any = null;
+    
+    if (contentType && contentType.includes('application/json')) {
+        try {
+            data = await response.json();
+        } catch (e) {
+            console.warn('Failed to parse JSON response:', e);
+            data = {}; 
+        }
+    } else {
+        // Handle non-JSON responses (like 404 HTML or empty 204)
+        const text = await response.text();
+        try {
+            data = text ? JSON.parse(text) : {};
+        } catch {
+            data = { message: text };
+        }
+    }
 
     if (!response.ok) {
       return {

@@ -12,5 +12,6 @@ namespace ComplianceSecurityAuditor.Data
 		Task<bool> RevokeRefreshTokenAsync(byte[] tokenHash, string? revokedByIp);
 		Task<Guid?> GetUserIdByRefreshTokenHashAsync(byte[] tokenHash);
 		Task<List<string>> GetRolesForUserAsync(Guid userId);
+		Task<bool> UpdateUserAsync(User user, byte[]? newPasswordHash = null);
 	}
 }

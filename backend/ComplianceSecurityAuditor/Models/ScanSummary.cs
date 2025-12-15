@@ -9,5 +9,7 @@ namespace ComplianceSecurityAuditor.Models
         public List<Violation> Violations { get; set; }
         // When saved to DB, this will contain the report id; null if not saved.
         public Guid? ReportId { get; set; }
+        public DateTime? ScanDate { get; set; }
+        public string? ScanPath { get; set; }
     }
 }

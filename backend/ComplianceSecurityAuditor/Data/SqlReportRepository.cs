@@ -149,13 +149,16 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 			var summary = new ScanSummary { Violations = new List<Violation>() };
 
 			// Read report
-			var cmd = new SqlCommand("SELECT Path, FilesScanned, ViolationsFound FROM Reports WHERE Id = @Id", conn);
+			var cmd = new SqlCommand("SELECT Path, FilesScanned, ViolationsFound, CreatedAt FROM Reports WHERE Id = @Id", conn);
 			cmd.Parameters.AddWithValue("@Id", reportId);
 			using var reader = await cmd.ExecuteReaderAsync();
 			if (await reader.ReadAsync())
 			{
+				summary.ScanPath = reader.GetString(0);
 				summary.FilesScanned = reader.GetInt32(1);
 				summary.ViolationsFound = reader.GetInt32(2);
+				summary.ScanDate = reader.GetDateTime(3);
+				summary.ReportId = reportId;
 			}
 			await reader.CloseAsync();
 
@@ -277,12 +280,12 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 
 			using var reader = await cmd.ExecuteReaderAsync();
 			var reportIds = new List<Guid>();
-			var meta = new Dictionary<Guid, (string Path, int FilesScanned, int ViolationsFound)>();
+			var meta = new Dictionary<Guid, (string Path, int FilesScanned, int ViolationsFound, DateTime CreatedAt)>();
 			while (await reader.ReadAsync())
 			{
 				var id = reader.GetGuid(0);
 				reportIds.Add(id);
-				meta[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3));
+				meta[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetDateTime(4));
 			}
 			await reader.CloseAsync();
 
@@ -333,7 +336,9 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 					FilesScanned = m.FilesScanned,
 					ViolationsFound = m.ViolationsFound,
 					Violations = violationsByReport.TryGetValue(rid, out var vlist) ? vlist : new List<Violation>(),
-					ReportId = rid
+					ReportId = rid,
+					ScanDate = m.CreatedAt,
+					ScanPath = m.Path
 				};
 				list.Add(summary);
 			}

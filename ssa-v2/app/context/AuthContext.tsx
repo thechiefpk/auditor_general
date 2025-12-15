@@ -9,6 +9,7 @@ import { API_ENDPOINTS, createAuthHeaders } from '../lib/api';
 // 1. Define the shape of a user
 interface User {
   token: string;
+  username?: string;
 }
 
 // 2. Define the shape of the context value
@@ -33,8 +34,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const token = Cookies.get('authToken');
+    const username = Cookies.get('authUsername');
     if (token) {
-      setUser({ token }); 
+      setUser({ token, username }); 
     }
   }, []);
 
@@ -48,11 +50,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
       const data = await res.json();
       if (res.ok) {
-        const newUser: User = { token: data.token };
-        setUser(newUser);
-        Cookies.set('authToken', data.token, { expires: 7 }); 
+        const token = data.token; 
+        Cookies.set('authToken', token, { expires: 1 });
+        Cookies.set('authUsername', username, { expires: 1 });
+        setUser({ token, username });
         toast.success('Login successful!');
-        router.push('/dashboard'); 
+        router.push('/dashboard');
       } else {
         toast.error(data.message || 'Login failed');
         console.error(data.message);
@@ -75,36 +78,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const data = await res.json();
 
       if (res.ok) {
-        // Auto-login on successful signup (assumes API returns a token)
-        const newUser: User = { token: data.token };
-        setUser(newUser);
-        Cookies.set('authToken', data.token, { expires: 7 }); 
-        toast.success('Signup successful! Welcome!');
-        router.push('/dashboard'); 
+        // Auto-login on successful signup
+        const token = data.token;
+        Cookies.set('authToken', token, { expires: 1 });
+        Cookies.set('authUsername', username, { expires: 1 });
+        setUser({ token, username });
+        toast.success('Account created successfully!');
+        router.push('/dashboard');
       } else {
         toast.error(data.message || 'Signup failed');
-        console.error(data.message);
-        // You should probably throw an error here to catch in the form
-        throw new Error(data.message || 'Signup failed');
       }
     } catch (error) {
       toast.error('An error occurred during signup');
-      console.error('An error occurred during signup', error);
-      throw error; // Re-throw error to be caught by the form
+      console.error(error);
     }
   };
 
-  // 7. Logout Function
   const logout = () => {
-    try {
-      setUser(null);
-      Cookies.remove('authToken');
-      toast.success('Logout successful!');
-      router.push('/login');
-    } catch (error) {
-      toast.error('Logout failed');
-      console.error('Logout error', error);
-    }
+    Cookies.remove('authToken');
+    Cookies.remove('authUsername');
+    setUser(null);
+    router.push('/login');
+    toast.success('Logged out');
   };
 
   // 8. Provide the context value

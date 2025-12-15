@@ -87,5 +87,27 @@ namespace ComplianceSecurityAuditor.Services
 			var token = new JwtSecurityToken(claims: claims, expires: DateTime.UtcNow.AddMinutes(30), signingCredentials: creds);
 			return new JwtSecurityTokenHandler().WriteToken(token);
 		}
+
+		public async Task<User?> GetUserByIdAsync(Guid id) => await _repo.GetUserByIdAsync(id);
+
+		public async Task<bool> UpdateUserAsync(Guid id, string username, string email, string? newPassword)
+		{
+			var user = await _repo.GetUserByIdAsync(id);
+			if (user == null) return false;
+			user.Username = username;
+			user.Email = email;
+			
+			if (!string.IsNullOrEmpty(newPassword))
+			{
+				var secret = _config["JWT_SECRET"];
+				var hash = SHA256.HashData(Encoding.UTF8.GetBytes(newPassword + secret));
+				// Assuming UpdateUserAsync in repo can handle password update, but current interface only takes User object.
+				// However, User model doesn't have PasswordHash property exposed (it's in DB but not in model).
+				// We need to modify UpdateUserAsync in Repo to take optional password hash.
+				return await _repo.UpdateUserAsync(user, hash);
+			}
+
+			return await _repo.UpdateUserAsync(user, null);
+		}
 	}
 }

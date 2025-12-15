@@ -17,6 +17,32 @@
   },
   {
     "ContainingType": "ComplianceSecurityAuditor.Controllers.AuthController",
+    "Method": "GetProfile",
+    "RelativePath": "api/auth/profile",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ComplianceSecurityAuditor.Controllers.AuthController",
+    "Method": "UpdateProfile",
+    "RelativePath": "api/auth/profile",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "req",
+        "Type": "ComplianceSecurityAuditor.Controllers.UpdateProfileRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ComplianceSecurityAuditor.Controllers.AuthController",
     "Method": "Refresh",
     "RelativePath": "api/auth/refresh",
     "HttpMethod": "POST",
@@ -146,6 +172,22 @@
       {
         "Name": "request",
         "Type": "ComplianceSecurityAuditor.Models.ScanRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ComplianceSecurityAuditor.Controllers.ScanController",
+    "Method": "ScanGitRepository",
+    "RelativePath": "api/scan/git",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ComplianceSecurityAuditor.Controllers.GitScanRequest",
         "IsRequired": true
       }
     ],

@@ -124,5 +124,31 @@ namespace ComplianceSecurityAuditor.Data
 			}
 			return list;
 		}
+
+		public async Task<bool> UpdateUserAsync(User user, byte[]? newPasswordHash = null)
+		{
+			using var c = new SqlConnection(_conn);
+			await c.OpenAsync();
+			
+			string sql = "UPDATE Users SET Username = @u, Email = @e";
+			if (newPasswordHash != null)
+			{
+				sql += ", PasswordHash = @ph";
+			}
+			sql += " WHERE Id = @id";
+
+			var cmd = new SqlCommand(sql, c);
+			cmd.Parameters.AddWithValue("@u", user.Username);
+			cmd.Parameters.AddWithValue("@e", user.Email);
+			cmd.Parameters.AddWithValue("@id", user.Id);
+			
+			if (newPasswordHash != null)
+			{
+				cmd.Parameters.AddWithValue("@ph", newPasswordHash);
+			}
+
+			var rows = await cmd.ExecuteNonQueryAsync();
+			return rows > 0;
+		}
 	}
 }

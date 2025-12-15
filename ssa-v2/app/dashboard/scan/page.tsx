@@ -187,36 +187,39 @@ export default function ScanPage() {
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
       'GDPR': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-      'HIPAA': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+      'HIPAA': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
       'Security': 'bg-red-500/10 text-red-400 border-red-500/20',
       'PCI-DSS': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       'Compliance': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
     };
-    return colors[category] || 'bg-slate-700/50 text-slate-300 border-slate-600';
+    return colors[category] || 'bg-zinc-800/50 text-zinc-300 border-zinc-700';
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       {/* Page Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
-        <h1 className="text-3xl font-bold text-white mb-2">
-          🔍 Security Compliance Scanner
+      <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl p-6 shadow-lg">
+        <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+          <svg className="w-8 h-8 text-zinc-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Compliance Scanner
         </h1>
-        <p className="text-slate-400">
-          Scan your codebase for security compliance violations and best practice issues
+        <p className="text-zinc-400">
+          Scan your codebase for compliance violations and best practice issues
         </p>
       </div>
 
       {/* Scan Form */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-lg">
+      <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl p-8 shadow-lg">
         {/* Tabs */}
-        <div className="flex space-x-4 mb-6 border-b border-slate-800">
+        <div className="flex space-x-4 mb-6 border-b border-zinc-800">
           <button
             onClick={() => setScanType('local')}
             className={`pb-2 px-4 font-medium transition-colors ${
               scanType === 'local'
-                ? 'text-blue-500 border-b-2 border-blue-500'
-                : 'text-slate-400 hover:text-white'
+                ? 'text-white border-b-2 border-white'
+                : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             Local Scan
@@ -225,8 +228,8 @@ export default function ScanPage() {
             onClick={() => setScanType('git')}
             className={`pb-2 px-4 font-medium transition-colors ${
               scanType === 'git'
-                ? 'text-blue-500 border-b-2 border-blue-500'
-                : 'text-slate-400 hover:text-white'
+                ? 'text-white border-b-2 border-white'
+                : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             Git Repository
@@ -238,7 +241,7 @@ export default function ScanPage() {
             <div>
               <label
                 htmlFor="path"
-                className="block text-sm font-medium text-slate-300 mb-2"
+                className="block text-sm font-medium text-zinc-300 mb-2"
               >
                 Directory or File Path
               </label>
@@ -249,28 +252,30 @@ export default function ScanPage() {
                   value={path}
                   onChange={(e) => setPath(e.target.value)}
                   placeholder="e.g., C:\Projects\MyApp or /home/user/project"
-                  className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
                   disabled={isScanning}
                 />
                 <button
                   type="submit"
                   disabled={isScanning}
-                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-blue-500/25 transition-all disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-8 py-3 bg-zinc-100 hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-semibold rounded-lg shadow-lg hover:shadow-zinc-500/10 transition-all disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isScanning ? (
                     <>
-                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                      <div className="animate-spin h-5 w-5 border-2 border-black border-t-transparent rounded-full"></div>
                       Scanning...
                     </>
                   ) : (
                     <>
-                      <span>🔍</span>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
                       Start Scan
                     </>
                   )}
                 </button>
               </div>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-zinc-500">
                 Enter the full path to the directory or file you want to scan
               </p>
             </div>
@@ -281,7 +286,7 @@ export default function ScanPage() {
               <div>
                 <label
                   htmlFor="gitUrl"
-                  className="block text-sm font-medium text-slate-300 mb-2"
+                  className="block text-sm font-medium text-zinc-300 mb-2"
                 >
                   Repository URL
                 </label>
@@ -291,7 +296,7 @@ export default function ScanPage() {
                   value={gitUrl}
                   onChange={(e) => setGitUrl(e.target.value)}
                   placeholder="https://github.com/username/repo.git"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
                   disabled={isScanning}
                   required
                 />
@@ -301,7 +306,7 @@ export default function ScanPage() {
                 <div>
                   <label
                     htmlFor="gitBranch"
-                    className="block text-sm font-medium text-slate-300 mb-2"
+                    className="block text-sm font-medium text-zinc-300 mb-2"
                   >
                     Branch (Optional)
                   </label>
@@ -311,14 +316,14 @@ export default function ScanPage() {
                     value={gitBranch}
                     onChange={(e) => setGitBranch(e.target.value)}
                     placeholder="main"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
                     disabled={isScanning}
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="gitToken"
-                    className="block text-sm font-medium text-slate-300 mb-2"
+                    className="block text-sm font-medium text-zinc-300 mb-2"
                   >
                     Access Token (Optional)
                   </label>
@@ -328,7 +333,7 @@ export default function ScanPage() {
                     value={gitToken}
                     onChange={(e) => setGitToken(e.target.value)}
                     placeholder="ghp_..."
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
                     disabled={isScanning}
                   />
                 </div>
@@ -338,16 +343,18 @@ export default function ScanPage() {
                 <button
                   type="submit"
                   disabled={isScanning}
-                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-blue-500/25 transition-all disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-8 py-3 bg-zinc-100 hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-semibold rounded-lg shadow-lg hover:shadow-zinc-500/10 transition-all disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isScanning ? (
                     <>
-                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                      <div className="animate-spin h-5 w-5 border-2 border-black border-t-transparent rounded-full"></div>
                       Cloning & Scanning...
                     </>
                   ) : (
                     <>
-                      <span>🔍</span>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
                       Start Git Scan
                     </>
                   )}
@@ -360,14 +367,14 @@ export default function ScanPage() {
 
       {/* Scanning Progress */}
       {isScanning && (
-        <div className="bg-blue-900/20 border border-blue-800 rounded-xl p-6">
+        <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
           <div className="flex items-center gap-4">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+            <div className="animate-spin h-8 w-8 border-4 border-zinc-500 border-t-transparent rounded-full"></div>
             <div>
-              <h3 className="font-semibold text-blue-100">
+              <h3 className="font-semibold text-white">
                 Scanning in progress...
               </h3>
-              <p className="text-sm text-blue-300">
+              <p className="text-sm text-zinc-400">
                 Analyzing your codebase for security compliance issues
               </p>
             </div>
@@ -380,25 +387,37 @@ export default function ScanPage() {
         <div className="space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg border-l-4 border-l-blue-500">
-              <div className="text-blue-500 text-3xl mb-2">📁</div>
-              <p className="text-slate-400 text-sm">Files Scanned</p>
+            <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl p-6 shadow-lg border-l-4 border-l-blue-500">
+              <div className="text-blue-500 text-3xl mb-2">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <p className="text-zinc-400 text-sm">Files Scanned</p>
               <p className="text-3xl font-bold text-white">
                 {scanResult.filesScanned}
               </p>
             </div>
             
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg border-l-4 border-l-red-500">
-              <div className="text-red-500 text-3xl mb-2">⚠️</div>
-              <p className="text-slate-400 text-sm">Violations Found</p>
+            <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl p-6 shadow-lg border-l-4 border-l-red-500">
+              <div className="text-red-500 text-3xl mb-2">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-zinc-400 text-sm">Violations Found</p>
               <p className="text-3xl font-bold text-white">
                 {scanResult.violationsFound}
               </p>
             </div>
             
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg border-l-4 border-l-purple-500">
-              <div className="text-purple-500 text-3xl mb-2">🏷️</div>
-              <p className="text-slate-400 text-sm">Categories</p>
+            <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl p-6 shadow-lg border-l-4 border-l-zinc-500">
+              <div className="text-zinc-500 text-3xl mb-2">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+              <p className="text-zinc-400 text-sm">Categories</p>
               <p className="text-3xl font-bold text-white">
                 {Object.keys(getCategoryBreakdown(scanResult.violations)).length}
               </p>
@@ -409,7 +428,11 @@ export default function ScanPage() {
           {scanResult.reportId && (
             <div className="bg-emerald-900/20 border border-emerald-800 rounded-xl p-4">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">✅</span>
+                <span className="text-2xl text-emerald-400">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
                 <div className="flex-1">
                   <p className="font-semibold text-emerald-100">
                     Report Saved
@@ -424,7 +447,7 @@ export default function ScanPage() {
 
           {/* Categories Breakdown */}
           {scanResult.violations.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
+            <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl p-6 shadow-lg">
               <h2 className="text-xl font-bold text-white mb-4">
                 Violations by Category
               </h2>
@@ -432,9 +455,9 @@ export default function ScanPage() {
                 {Object.entries(getCategoryBreakdown(scanResult.violations)).map(([category, count]) => (
                   <div
                     key={category}
-                    className="flex items-center justify-between p-4 bg-slate-800 rounded-lg border border-slate-700"
+                    className="flex items-center justify-between p-4 bg-zinc-800/30 rounded-lg border border-zinc-800"
                   >
-                    <span className="font-medium text-slate-200">
+                    <span className="font-medium text-zinc-200">
                       {category}
                     </span>
                     <span className="px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full text-sm font-semibold">
@@ -448,44 +471,44 @@ export default function ScanPage() {
 
           {/* Violations Table */}
           {violations.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
+            <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl p-6 shadow-lg">
               <h2 className="text-xl font-bold text-white mb-4">
                 Detailed Violations ({violations.length})
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-slate-800">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">
+                    <tr className="border-b border-zinc-800">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-zinc-300">
                         File Path
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-zinc-300">
                         Line
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-zinc-300">
                         Rule Name
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-zinc-300">
                         Category
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-zinc-300">
                         Matched Text
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-zinc-300">
                         Description
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-zinc-800">
                     {violations.map((violation, index) => (
                       <tr
                         key={index}
-                        className="hover:bg-slate-800/50 transition-colors"
+                        className="hover:bg-zinc-800/30 transition-colors"
                       >
-                        <td className="py-3 px-4 text-xs text-slate-300 font-mono">
+                        <td className="py-3 px-4 text-xs text-zinc-300 font-mono">
                           {violation.filePath}
                         </td>
-                        <td className="py-3 px-4 text-sm text-slate-400 font-mono">
+                        <td className="py-3 px-4 text-sm text-zinc-400 font-mono">
                           {violation.lineNumber}
                         </td>
                         <td className="py-3 px-4 text-sm text-white font-semibold">
@@ -496,10 +519,10 @@ export default function ScanPage() {
                             {violation.category}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-xs text-slate-300 font-mono max-w-xs truncate">
+                        <td className="py-3 px-4 text-xs text-zinc-300 font-mono max-w-xs truncate">
                           {violation.matchedText}
                         </td>
-                        <td className="py-3 px-4 text-sm text-slate-400 max-w-md">
+                        <td className="py-3 px-4 text-sm text-zinc-400 max-w-md">
                           {violation.description}
                         </td>
                       </tr>
@@ -514,12 +537,16 @@ export default function ScanPage() {
 
       {/* Empty State */}
       {!showResults && !isScanning && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
-          <div className="text-6xl mb-4">🔍</div>
+        <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl p-12 text-center">
+          <div className="text-6xl mb-4 flex justify-center">
+            <svg className="w-16 h-16 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
           <h3 className="text-xl font-semibold text-white mb-2">
             Ready to Scan
           </h3>
-          <p className="text-slate-400">
+          <p className="text-zinc-400">
             Enter a local path or Git repository URL above to start scanning
           </p>
         </div>
