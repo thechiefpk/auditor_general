@@ -47,7 +47,7 @@ export default function LoginPage() {
         </div>
         
         <div className="text-center max-w-md px-6 translate-x-[20px]">
-            <h2 className="font-bold tracking-tight text-white mb-3">Enterprise Security Audit</h2>
+            <h2 className="font-bold tracking-tight text-white mb-3">Enterprise Compliance Audit</h2>
             <p className="text-zinc-400 text-sm leading-relaxed">
                 Comprehensive compliance monitoring and automated security assessments for your entire infrastructure.
             </p>
@@ -103,7 +103,7 @@ export default function LoginPage() {
             {/* Sign-up Link */}
             <p className="mt-6 text-center text-xs text-zinc-500">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="font-medium text-zinc-300 hover:text-white transition-colors">
+            <Link href="/signup" prefetch={false} className="font-medium text-zinc-300 hover:text-white transition-colors">
                 Create account
             </Link>
             </p>

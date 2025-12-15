@@ -24,7 +24,7 @@ export default function Header() {
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6">
         {/* Logo */}
-        <Link href="/home" className="group flex items-center gap-2">
+        <Link href="/home" prefetch={false} className="group flex items-center gap-2">
           <span className="text-xl font-bold tracking-tight text-white group-hover:text-zinc-300 transition-colors">
             Secure<span className="text-zinc-400">Soft</span>
           </span>
@@ -37,12 +37,14 @@ export default function Header() {
               <div className="hidden md:flex items-center gap-6">
                 <Link
                   href="/dashboard"
+                  prefetch={false}
                   className="text-sm font-medium text-zinc-400 hover:text-white transition-colors tracking-wide"
                 >
                   Dashboard
                 </Link>
                 <Link
                   href="/dashboard/scan"
+                  prefetch={false}
                   className="text-sm font-medium text-zinc-400 hover:text-white transition-colors tracking-wide"
                 >
                   New Scan
@@ -78,12 +80,14 @@ export default function Header() {
             <>
               <Link
                 href="/login"
+                prefetch={false}
                 className="text-sm font-medium text-zinc-300 hover:text-white transition-colors tracking-wide"
               >
                 Sign in
               </Link>
               <Link
                 href="/signup"
+                prefetch={false}
                 className="rounded-full bg-white text-black py-2 px-5 text-sm font-bold shadow-lg shadow-zinc-500/10 hover:bg-zinc-200 hover:shadow-zinc-500/20 transition-all transform hover:-translate-y-0.5"
               >
                 Get Started
