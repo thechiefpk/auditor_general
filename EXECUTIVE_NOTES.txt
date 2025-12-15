@@ -1,0 +1,25 @@
+-----------------------------------------------------------------------------------------------------------
+Compliar proj
+-----------------------------------------------------------------------------------------------------------
+-core feature test and build
+	-test auth flow
+	-develop and test scan job scheduling and etc
+	-develop and test git scan
+	-develop report creation export feature
+-extended feature buildup
+	-integrate privado for advance scanning
+	-develop network audit discovery
+	-develop and test drive scan
+	-optional code standards and quality checks
+
+-Final report completion
+-----------------------------------------------------------------------------------------------------------
+
+https://localhost:7120/api/auth/login
+
+{
+  "username": "jack_sparrow",
+  "email": "jack@gmail.com",
+  "password": "pass@jack", "admin123"
+}
+
