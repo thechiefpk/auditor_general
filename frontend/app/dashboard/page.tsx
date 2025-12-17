@@ -49,6 +49,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchActiveCount();
   }, [user]);
 
   const fetchDashboardStats = async () => {
@@ -90,6 +91,24 @@ export default function DashboardPage() {
       console.error('Error fetching dashboard stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActiveCount = async () => {
+    if (!user?.token) return;
+    try {
+      const result = await apiRequest<{ count: number }>(
+        API_ENDPOINTS.SCAN_ACTIVECOUNT,
+        {
+          method: 'GET',
+          headers: createAuthHeaders(user.token),
+        }
+      );
+      if (result.data) {
+        setStats((prev) => ({ ...prev, activeScans: result.data!.count }));
+      }
+    } catch (e) {
+      // ignore
     }
   };
 

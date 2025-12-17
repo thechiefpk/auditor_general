@@ -8,10 +8,16 @@ export const API_ENDPOINTS = {
   PROFILE: `${API_BASE_URL}/api/auth/profile`,
   
   // Scan endpoints
-  SCAN: `${API_BASE_URL}/api/scan`,
+  SCAN_LOCAL: `${API_BASE_URL}/api/scan/local`,
   SCAN_GIT: `${API_BASE_URL}/api/scan/git`,
+  SCAN_PROGRESS: (jobId: string) => `${API_BASE_URL}/api/scan/progress/${jobId}`,
+  SCAN_CANCEL: (jobId: string) => `${API_BASE_URL}/api/scan/${jobId}/cancel`,
+  SCAN_ACTIVECOUNT: `${API_BASE_URL}/api/scan/activecount`,
   MY_REPORTS: `${API_BASE_URL}/api/myreports`,
   REPORT: (id: string) => `${API_BASE_URL}/api/report/${id}`,
+  REPORT_DELETE: (id: string) => `${API_BASE_URL}/api/report/${id}`,
+  REPORT_CSV: (id: string) => `${API_BASE_URL}/api/report/${id}/export/csv`,
+  REPORT_PDF: (id: string) => `${API_BASE_URL}/api/report/${id}/export/pdf`,
   STATS: (id: string) => `${API_BASE_URL}/api/stats/${id}`,
   VIOLATIONS: (id: string) => `${API_BASE_URL}/api/report/${id}/violations`,
 };

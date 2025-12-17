@@ -1,12 +1,15 @@
 using ComplianceSecurityAuditor.Library;
 using ComplianceSecurityAuditor.Models;
 using ComplianceSecurityAuditor.Services;
+using ComplianceSecurityAuditor.Data;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Claims;
+using System.Linq;
 using System.Threading.Tasks;
+using Hangfire;
 
 namespace ComplianceSecurityAuditor.Controllers
 {
@@ -15,10 +18,14 @@ namespace ComplianceSecurityAuditor.Controllers
     public class ScanController : ControllerBase
     {
         private readonly ComplianceService _complianceService;
+        private readonly IScanProgressRepository _progressRepo;
+        private readonly PdfReportService _pdfService;
 
-        public ScanController(ComplianceService complianceService)
+        public ScanController(ComplianceService complianceService, IScanProgressRepository progressRepo, PdfReportService pdfService)
         {
             _complianceService = complianceService;
+            _progressRepo = progressRepo;
+            _pdfService = pdfService;
         }
 
         [HttpPost("scan")]
@@ -50,6 +57,35 @@ namespace ComplianceSecurityAuditor.Controllers
 
             var summary = _complianceService.Scan(userId, path);
             return Ok(summary);
+        }
+
+        [HttpPost("scan/local")]
+        public IActionResult EnqueueLocalScan([FromBody] ScanRequest request)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Path))
+                return BadRequest(new { error = "Request body must contain a non-empty 'path' field." });
+            var path = Utility.NormalizePath(request.Path, out var normalizeError);
+            if (normalizeError is not null)
+                return BadRequest(new { error = normalizeError });
+            if (!Directory.Exists(path) && !System.IO.File.Exists(path))
+                return BadRequest(new { error = "Path does not exist.", path });
+            Guid userId;
+            try
+            {
+                userId = GetCurrentUserId();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            var jobId = Guid.NewGuid().ToString("N");
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunLocalScan(jobId, userId, path));
+            _progressRepo.StartAsync(jobId, userId, "Queued", hangId).Wait();
+            return Ok(new { jobId });
         }
 
         [HttpGet("myreports")]
@@ -146,13 +182,110 @@ namespace ComplianceSecurityAuditor.Controllers
             }
         }
 
+        [HttpDelete("report/{id}")]
+        public async Task<IActionResult> DeleteReport(Guid id)
+        {
+            Guid userId;
+            try
+            {
+                userId = GetCurrentUserId();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+
+            var ok = await _complianceService.DeleteReportAsync(userId, id);
+            if (!ok) return NotFound(new { error = "Report not found or not owned by user." });
+            return Ok(new { deleted = true });
+        }
+
+        [HttpGet("report/{id}/export/csv")]
+        public async Task<IActionResult> ExportReportCsv(Guid id)
+        {
+            // No auth required to download? Enforce ownership
+            Guid userId;
+            try
+            {
+                userId = GetCurrentUserId();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+
+            // Verify the report exists and belongs to the user
+            var summaries = await _complianceService.GetReportsByUserAsync(userId);
+            if (!summaries.Any(s => s.ReportId == id))
+                return NotFound(new { error = "Report not found or not owned by user." });
+
+            var summary = await _complianceService.GetReportAsync(id);
+            var violations = await _complianceService.GetViolationsAllAsync(id);
+
+            var sb = new System.Text.StringBuilder();
+            // Header for summary
+            sb.AppendLine("ReportId,Path,FilesScanned,ViolationsFound,CreatedAt");
+            sb.AppendLine($"{summary.ReportId},{EscapeCsv(summary.ScanPath)},{summary.FilesScanned},{summary.ViolationsFound},{summary.ScanDate:O}");
+            sb.AppendLine();
+            // Header for violations
+            sb.AppendLine("FilePath,LineNumber,MatchedText,RuleId,RuleName,Category");
+            foreach (var v in violations)
+            {
+                sb.AppendLine($"{EscapeCsv(v.FilePath)},{v.LineNumber},{EscapeCsv(v.MatchedText ?? string.Empty)},{EscapeCsv(v.ViolatedRule.RuleId)},{EscapeCsv(v.ViolatedRule.Name)},{EscapeCsv(v.ViolatedRule.Category)}");
+            }
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var fileName = $"report_{id}.csv";
+            return File(bytes, "text/csv", fileName);
+        }
+
+        [HttpGet("report/{id}/export/pdf")]
+        public async Task<IActionResult> ExportReportPdf(Guid id)
+        {
+            Guid userId;
+            try
+            {
+                userId = GetCurrentUserId();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+
+            try
+            {
+                // Verify ownership
+                var summaries = await _complianceService.GetReportsByUserAsync(userId);
+                if (!summaries.Any(s => s.ReportId == id))
+                    return NotFound(new { error = "Report not found or not owned by user." });
+
+                var stats = await _complianceService.GetStatisticsAsync(id);
+                var pdfBytes = _pdfService.GenerateReport(stats);
+                var fileName = $"ComplianceReport_{id}.pdf";
+                return File(pdfBytes, "application/pdf", fileName);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error exporting PDF: {ex}");
+                return StatusCode(500, new { error = ex.ToString() });
+            }
+        }
+
+        private static string EscapeCsv(string input)
+        {
+            if (input == null) return "";
+            var needsQuotes = input.Contains(",") || input.Contains("\"") || input.Contains("\n") || input.Contains("\r");
+            var escaped = input.Replace("\"", "\"\"");
+            return needsQuotes ? $"\"{escaped}\"" : escaped;
+        }
+
         /// <summary>
         /// Scans a Git repository by cloning it temporarily and running compliance checks.
         /// </summary>
         /// <param name="request">Git repository scan request containing URL and optional authentication</param>
         /// <returns>Scan summary with violations found</returns>
         [HttpPost("scan/git")]
-        public async Task<IActionResult> ScanGitRepository([FromBody] GitScanRequest request)
+        public IActionResult ScanGitRepository([FromBody] GitScanRequest request)
         {
             if (request is null || string.IsNullOrWhiteSpace(request.RepositoryUrl))
                 return BadRequest(new { error = "Request body must contain a non-empty 'repositoryUrl' field." });
@@ -174,53 +307,50 @@ namespace ComplianceSecurityAuditor.Controllers
             {
                 return BadRequest(new { error = ex.Message });
             }
+            var jobId = Guid.NewGuid().ToString("N");
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunGitScan(jobId, userId, request.RepositoryUrl, request.Branch, request.AccessToken));
+            _progressRepo.StartAsync(jobId, userId, "Queued", hangId).Wait();
+            return Ok(new { jobId });
+        }
 
-            string? tempDirectory = null;
+        [HttpGet("scan/progress/{jobId}")]
+        public async Task<IActionResult> GetProgress(string jobId)
+        {
+            var progress = await _progressRepo.GetAsync(jobId);
+            if (progress == null) return NotFound();
+            return Ok(progress);
+        }
+
+        [HttpGet("scan/activecount")]
+        public async Task<IActionResult> GetActiveCount()
+        {
+            Guid userId;
             try
             {
-                // Create temporary directory for cloning
-                tempDirectory = Path.Combine(Path.GetTempPath(), $"securesoft_scan_{Guid.NewGuid()}");
-                Directory.CreateDirectory(tempDirectory);
-
-                // Clone the repository
-                var cloneSuccess = await CloneRepositoryAsync(
-                    request.RepositoryUrl,
-                    tempDirectory,
-                    request.Branch,
-                    request.AccessToken
-                );
-
-                if (!cloneSuccess)
-                    return BadRequest(new { error = "Failed to clone repository. Check URL and credentials." });
-
-                // Scan the cloned repository
-                var summary = _complianceService.Scan(userId, tempDirectory);
-
-                // Add repository metadata to summary
-                summary.RepositoryUrl = request.RepositoryUrl;
-                summary.Branch = request.Branch ?? "default";
-
-                return Ok(summary);
+                userId = GetCurrentUserId();
             }
-            catch (Exception ex)
+            catch (UnauthorizedAccessException)
             {
-                return StatusCode(500, new { error = "An error occurred during Git repository scan.", details = ex.Message });
+                return Unauthorized(new { error = "Authentication required." });
             }
-            finally
+            var count = await _progressRepo.GetActiveCountAsync(userId);
+            return Ok(new { count });
+        }
+
+        [HttpPost("scan/{jobId}/cancel")]
+        public async Task<IActionResult> Cancel(string jobId)
+        {
+            Guid userId;
+            try
             {
-                // Cleanup: Delete temporary directory
-                if (tempDirectory != null && Directory.Exists(tempDirectory))
-                {
-                    try
-                    {
-                        Directory.Delete(tempDirectory, recursive: true);
-                    }
-                    catch
-                    {
-                        // Log cleanup failure but don't throw
-                    }
-                }
+                userId = GetCurrentUserId();
             }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+            await _progressRepo.RequestCancelAsync(jobId);
+            return Ok(new { cancelled = true });
         }
 
         /// <summary>

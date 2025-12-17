@@ -1,5 +1,6 @@
 using ComplianceSecurityAuditor.Data;
 using ComplianceSecurityAuditor.Models;
+using ComplianceSecurityAuditor.Library;
 using Microsoft.Data.SqlClient;
 using static ComplianceSecurityAuditor.Models.Audit;
 using System.Linq;
@@ -129,14 +130,104 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 			}
 			await reader.CloseAsync();
 
+            // Calculate duration from ScanProgress
+            var dcmd = new SqlCommand("SELECT DATEDIFF(SECOND, StartedAt, CompletedAt) FROM ScanProgress WHERE ReportId = @Id", conn);
+            dcmd.Parameters.AddWithValue("@Id", reportId);
+            var durationObj = await dcmd.ExecuteScalarAsync();
+            if (durationObj != null && durationObj != DBNull.Value)
+            {
+                stats.ScanDuration = Convert.ToDouble(durationObj);
+            }
+
 			// Violations by category
 			var vcmd = new SqlCommand("SELECT Category, COUNT(*) FROM Violations WHERE ReportId = @Id GROUP BY Category", conn);
 			vcmd.Parameters.AddWithValue("@Id", reportId);
 			using var vreader = await vcmd.ExecuteReaderAsync();
 			while (await vreader.ReadAsync())
 			{
-				stats.ViolationsByCategory.Add(vreader.GetString(0), vreader.GetInt32(1));
+				var cat = vreader.GetString(0);
+				var count = vreader.GetInt32(1);
+				stats.ViolationsByCategory.Add(cat, count);
+
+                // Infer severity from category for now
+                var sev = cat switch {
+                    "HIPAA" => "critical",
+                    "Financial" => "critical",
+                    "GDPR" => "high",
+                    "Security" => "high",
+                    "Database" => "medium",
+                    _ => "low"
+                };
+                if (stats.ViolationsBySeverity.ContainsKey(sev))
+                    stats.ViolationsBySeverity[sev] += count;
+                else
+                    stats.ViolationsBySeverity[sev] = count;
 			}
+			await vreader.CloseAsync();
+
+            // Violations by File Type (Extension)
+            // Extract extension using SQL if possible, or simple string manipulation.
+            // Since FilePath is standard, we can use RIGHT/CHARINDEX/REVERSE logic or just grab all file paths and process in memory if dataset is small, 
+            // but SQL is better.
+            // SQL Server: REVERSE(LEFT(REVERSE(FilePath), CHARINDEX('.', REVERSE(FilePath)) - 1)) gets 'cs' from 'file.cs'
+            // But let's be safer and just get counts by FilePath ending
+            var fcmd = new SqlCommand(@"
+                SELECT 
+                    CASE 
+                        WHEN CHARINDEX('.', REVERSE(FilePath)) > 0 
+                        THEN RIGHT(FilePath, CHARINDEX('.', REVERSE(FilePath)) - 1)
+                        ELSE 'unknown'
+                    END as Extension,
+                    COUNT(*) 
+                FROM Violations 
+                WHERE ReportId = @Id 
+                GROUP BY 
+                    CASE 
+                        WHEN CHARINDEX('.', REVERSE(FilePath)) > 0 
+                        THEN RIGHT(FilePath, CHARINDEX('.', REVERSE(FilePath)) - 1)
+                        ELSE 'unknown'
+                    END", conn);
+            fcmd.Parameters.AddWithValue("@Id", reportId);
+            using var freader = await fcmd.ExecuteReaderAsync();
+            while (await freader.ReadAsync())
+            {
+                var ext = freader.GetString(0).ToLowerInvariant();
+                var count = freader.GetInt32(1);
+                if (!ext.StartsWith(".")) ext = "." + ext; // Ensure dot prefix
+                
+                stats.ViolationsByFileType[ext] = count;
+            }
+            await freader.CloseAsync();
+
+            // Top Violations with Recommendations
+            var tcmd = new SqlCommand(@"
+                SELECT TOP 5 RuleId, RuleName, Category, COUNT(*) as Count 
+                FROM Violations 
+                WHERE ReportId = @Id 
+                GROUP BY RuleId, RuleName, Category 
+                ORDER BY Count DESC", conn);
+            tcmd.Parameters.AddWithValue("@Id", reportId);
+            
+            using var treader = await tcmd.ExecuteReaderAsync();
+            while (await treader.ReadAsync())
+            {
+                var ruleId = treader.GetString(0);
+                var ruleName = treader.GetString(1);
+                var cat = treader.GetString(2);
+                var count = treader.GetInt32(3);
+
+                var (solution, reference) = RemediationHelper.GetRemediation(ruleId, cat);
+
+                stats.TopViolations.Add(new TopViolation
+                {
+                    RuleId = ruleId,
+                    RuleName = ruleName,
+                    Category = cat,
+                    Count = count,
+                    SuggestiveSolution = solution,
+                    ReferenceUrl = reference
+                });
+            }
 
 			return stats;
 		}
@@ -341,6 +432,48 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 					ScanPath = m.Path
 				};
 				list.Add(summary);
+			}
+
+			return list;
+		}
+
+		public async Task<bool> DeleteReportAsync(Guid userId, Guid reportId)
+		{
+			using var conn = new SqlConnection(_connectionString);
+			await conn.OpenAsync();
+
+			// Ensure only the owner can delete the report
+			var cmd = new SqlCommand("DELETE FROM Reports WHERE Id = @Id AND UserId = @UserId", conn);
+			cmd.Parameters.AddWithValue("@Id", reportId);
+			cmd.Parameters.AddWithValue("@UserId", userId);
+			var affected = await cmd.ExecuteNonQueryAsync();
+			return affected > 0;
+		}
+
+		public async Task<List<Violation>> GetViolationsAllAsync(Guid reportId)
+		{
+			using var conn = new SqlConnection(_connectionString);
+			await conn.OpenAsync();
+
+			var list = new List<Violation>();
+			var q = @"SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category 
+					  FROM Violations 
+					  WHERE ReportId = @Id 
+					  ORDER BY FilePath, LineNumber";
+			var cmd = new SqlCommand(q, conn);
+			cmd.Parameters.AddWithValue("@Id", reportId);
+
+			using var reader = await cmd.ExecuteReaderAsync();
+			while (await reader.ReadAsync())
+			{
+				var file = reader.GetString(0);
+				var line = reader.GetInt32(1);
+				var matched = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+				var ruleId = reader.GetString(3);
+				var ruleName = reader.GetString(4);
+				var category = reader.GetString(5);
+				var rule = new AuditRule(ruleId, ruleName, category, string.Empty, null!);
+				list.Add(new Violation(file, line, matched, rule));
 			}
 
 			return list;
