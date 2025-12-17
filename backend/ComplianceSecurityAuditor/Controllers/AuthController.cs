@@ -1,3 +1,4 @@
+using FluentValidation;
 using ComplianceSecurityAuditor.Models;
 using ComplianceSecurityAuditor.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -11,13 +12,25 @@ namespace ComplianceSecurityAuditor.Controllers
 	public class AuthController : ControllerBase
 	{
 		private readonly AuthService _auth;
-		public AuthController(AuthService auth) { _auth = auth; }
+		private readonly IValidator<LoginRequest> _loginValidator;
+		private readonly IValidator<RegisterRequest> _registerValidator;
+
+		public AuthController(AuthService auth, IValidator<LoginRequest> loginValidator, IValidator<RegisterRequest> registerValidator) 
+		{ 
+			_auth = auth;
+			_loginValidator = loginValidator;
+			_registerValidator = registerValidator;
+		}
 
 		[HttpPost("login")]
 		[AllowAnonymous]
 		public async Task<IActionResult> Login([FromBody] LoginRequest req)
 		{
-			if (req == null || string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password)) return BadRequest(new { error = "Username and password required" });
+			if (req == null) return BadRequest(new { message = "Request body is required" });
+			
+			var validation = await _loginValidator.ValidateAsync(req);
+			if (!validation.IsValid) return BadRequest(new { message = validation.Errors[0].ErrorMessage });
+
 			try
 			{
 				var (token, refresh) = await _auth.AuthenticateAsync(req.Username, req.Password, HttpContext.Connection.RemoteIpAddress?.ToString());
@@ -25,7 +38,7 @@ namespace ComplianceSecurityAuditor.Controllers
 			}
 			catch (UnauthorizedAccessException)
 			{
-				return Unauthorized(new { error = "Invalid credentials" });
+				return Unauthorized(new { message = "Invalid credentials" });
 			}
 		}
 
@@ -33,15 +46,21 @@ namespace ComplianceSecurityAuditor.Controllers
 		[AllowAnonymous]
 		public async Task<IActionResult> Register([FromBody] RegisterRequest req)
 		{
-			if (req == null || string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password) || string.IsNullOrWhiteSpace(req.Email)) return BadRequest(new { error = "username,email,password required" });
+			if (req == null) return BadRequest(new { message = "Request body is required" });
+
+			var validation = await _registerValidator.ValidateAsync(req);
+			if (!validation.IsValid) return BadRequest(new { message = validation.Errors[0].ErrorMessage });
+
 			try
 			{
 				var id = await _auth.RegisterAsync(req.Username, req.Email, req.Password);
-				return Ok(new { id });
+				// Auto-login
+				var (token, refresh) = await _auth.AuthenticateAsync(req.Username, req.Password, HttpContext.Connection.RemoteIpAddress?.ToString());
+				return Ok(new { token, refresh });
 			}
 			catch (InvalidOperationException ex)
 			{
-				return Conflict(new { error = ex.Message });
+				return Conflict(new { message = ex.Message });
 			}
 		}
 

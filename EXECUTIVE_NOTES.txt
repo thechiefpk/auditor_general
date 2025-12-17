@@ -2,11 +2,17 @@
 Compliar proj
 -----------------------------------------------------------------------------------------------------------
 -core feature test and build
-	-test auth flow
-	-develop and test scan job scheduling and etc
+	-develop and test scan job scheduling
+		-job mgmt idea finalize
+		-implement with new feature branch
+	-develop report creation and export feature
+		-approach finalize
+		-implement with new feature branch
 	-develop and test git scan
-	-develop report creation export feature
+		-approach finalize
+		-implement with new feature branch
 -extended feature buildup
+	-forgot password, dashboard analytics
 	-integrate privado for advance scanning
 	-develop network audit discovery
 	-develop and test drive scan
@@ -23,3 +29,4 @@ https://localhost:7120/api/auth/login
   "password": "pass@jack", "admin123"
 }
 
+kingslayer@gmail.com : King@123

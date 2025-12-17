@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
-import { API_ENDPOINTS, createAuthHeaders } from '../lib/api';
+import { API_ENDPOINTS, createAuthHeaders, apiRequest } from '../lib/api';
 
 // 1. Define the shape of a user
 interface User {
@@ -15,9 +15,9 @@ interface User {
 // 2. Define the shape of the context value
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   logout: () => void;
-  signup: (username: string, email: string, password: string) => Promise<void>; // <-- ADDED
+  signup: (username: string, email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
 }
 
 // 3. Create the Context
@@ -42,55 +42,58 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // 5. Login Function
   const login = async (username: string, password: string) => {
+    console.log('AuthContext.login called with:', username);
     try {
-      const res = await fetch(API_ENDPOINTS.LOGIN, {
+      const { data, error, status } = await apiRequest(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: createAuthHeaders(),
         body: JSON.stringify({ username, password }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        const token = data.token; 
+      if (!error && data) {
+        const token = (data as any).token;
         Cookies.set('authToken', token, { expires: 1 });
         Cookies.set('authUsername', username, { expires: 1 });
         setUser({ token, username });
         toast.success('Login successful!');
         router.push('/dashboard');
+        return { ok: true };
       } else {
-        toast.error(data.message || 'Login failed');
-        console.error(data.message);
+        const msg = error || 'Login failed';
+        // toast.error(msg); // Removed to avoid double toast in UI components
+        return { ok: false, message: msg };
       }
     } catch (error) {
-      toast.error('An error occurred during login');
-      console.error('An error occurred during login', error);
+      const msg = 'An error occurred during login';
+      // toast.error(msg); // Removed to avoid double toast in UI components
+      return { ok: false, message: msg };
     }
   };
 
-  // 6. Signup Function (NEW)
+  // 6. Signup Function
   const signup = async (username: string, email: string, password: string) => {
     try {
-      const res = await fetch(API_ENDPOINTS.REGISTER, {
+      const { data, error, status } = await apiRequest(API_ENDPOINTS.REGISTER, {
         method: 'POST',
         headers: createAuthHeaders(),
         body: JSON.stringify({ username, email, password }),
       });
-      
-      const data = await res.json();
-
-      if (res.ok) {
-        // Auto-login on successful signup
-        const token = data.token;
+      if (!error && data) {
+        const token = (data as any).token;
         Cookies.set('authToken', token, { expires: 1 });
         Cookies.set('authUsername', username, { expires: 1 });
         setUser({ token, username });
         toast.success('Account created successfully!');
         router.push('/dashboard');
+        return { ok: true };
       } else {
-        toast.error(data.message || 'Signup failed');
+        const msg = error || 'Signup failed';
+        // toast.error(msg); // Removed to avoid double toast in UI components
+        return { ok: false, message: msg };
       }
     } catch (error) {
-      toast.error('An error occurred during signup');
-      console.error(error);
+      const msg = 'An error occurred during signup';
+      // toast.error(msg); // Removed to avoid double toast in UI components
+      return { ok: false, message: msg };
     }
   };
 

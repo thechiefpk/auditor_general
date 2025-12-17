@@ -1,8 +1,10 @@
 using ComplianceSecurityAuditor.Services;
 using ComplianceSecurityAuditor.Data;
+using ComplianceSecurityAuditor.Validators;
 using SecureSoftAPI.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using FluentValidation;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,6 +46,9 @@ builder.Services.AddCors(options =>
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Register FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 // Prefer env var CONNECTION_STRING if present; otherwise use local dev with TrustServerCertificate
 var conn = builder.Configuration["SQL_SERVER_CONNECTION"];

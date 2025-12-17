@@ -5,12 +5,15 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SecureGlobe from '../components/SecureGlobe';
+import toast from 'react-hot-toast';
 
 export default function SignupPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { signup, user } = useAuth();
+  const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
   // 1. If user is already logged in, redirect
@@ -23,14 +26,27 @@ export default function SignupPage() {
   // 2. Handle form submission
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    try {
-      // We assume the signup function will auto-login
-      await signup(username, email, password);
-      // The signup function in context will redirect on success
-    } catch (error) {
-      console.error('Signup failed', error);
-      // You can add state here to show an error message
+    const newErrors: { username?: string; email?: string; password?: string } = {};
+    if (!username.trim() || username.trim().length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      newErrors.email = 'Enter a valid email address';
+    }
+    if (!password || password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
+    setSubmitting(true);
+    const result = await signup(username.trim(), email.trim(), password);
+    if (!result.ok) {
+      toast.error(result.message || 'Signup failed');
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -75,10 +91,10 @@ export default function SignupPage() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                required
                 className="block w-full rounded-md border border-zinc-800 bg-zinc-900/50 p-2.5 text-sm text-white placeholder-zinc-500 shadow-sm focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:outline-none transition-all"
                 placeholder="Username"
               />
+              {errors.username && <p className="mt-1 text-xs text-red-400">{errors.username}</p>}
             </div>
 
             {/* Email Input */}
@@ -89,10 +105,10 @@ export default function SignupPage() {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 className="block w-full rounded-md border border-zinc-800 bg-zinc-900/50 p-2.5 text-sm text-white placeholder-zinc-500 shadow-sm focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:outline-none transition-all"
                 placeholder="Email address"
               />
+              {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email}</p>}
             </div>
 
             {/* Password Input */}
@@ -103,18 +119,19 @@ export default function SignupPage() {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 className="block w-full rounded-md border border-zinc-800 bg-zinc-900/50 p-2.5 text-sm text-white placeholder-zinc-500 shadow-sm focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:outline-none transition-all"
                 placeholder="Password"
               />
+              {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full rounded-md bg-white py-2.5 px-4 text-center text-sm font-medium text-black shadow-lg shadow-zinc-900/20 hover:bg-zinc-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:ring-offset-zinc-950 mt-2"
+              disabled={submitting}
+              className={`w-full rounded-md py-2.5 px-4 text-center text-sm font-medium shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:ring-offset-zinc-950 mt-2 ${submitting ? 'bg-zinc-300 text-zinc-700 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200'}`}
             >
-              Create Account
+              {submitting ? 'Creating…' : 'Create Account'}
             </button>
           </form>
 

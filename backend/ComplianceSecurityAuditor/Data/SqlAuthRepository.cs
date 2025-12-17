@@ -75,7 +75,7 @@ namespace ComplianceSecurityAuditor.Data
 		{
 			using var c = new SqlConnection(_conn);
 			await c.OpenAsync();
-			var cmd = new SqlCommand("SELECT Id, Username, Email, IsEmailConfirmed, CreatedAt FROM Users WHERE Username = @u AND PasswordHash = @h", c);
+			var cmd = new SqlCommand("SELECT Id, Username, Email, IsEmailConfirmed, CreatedAt FROM Users WHERE (Username = @u OR Email = @u) AND PasswordHash = @h", c);
 			cmd.Parameters.AddWithValue("@u", username);
 			cmd.Parameters.AddWithValue("@h", passwordHash);
 			using var r = await cmd.ExecuteReaderAsync();

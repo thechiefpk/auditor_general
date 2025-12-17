@@ -5,10 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SecureGlobe from '../components/SecureGlobe';
+import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{ user?: string; password?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
   const { login, user } = useAuth();
   const router = useRouter();
 
@@ -22,11 +25,31 @@ export default function LoginPage() {
   // 2. Handle form submission
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    try {
-      await login(emailOrUsername, password);
-    } catch (error) {
-      console.error('Login failed', error);
+    const newErrors: { user?: string; password?: string } = {};
+    const isEmail = emailOrUsername.includes('@');
+    if (!emailOrUsername.trim()) {
+      newErrors.user = 'Enter username or email';
+    } else if (isEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailOrUsername.trim())) {
+        newErrors.user = 'Enter a valid email address';
+      }
+    } else if (emailOrUsername.trim().length < 3) {
+      newErrors.user = 'Username must be at least 3 characters';
     }
+    if (!password) {
+      newErrors.password = 'Enter your password';
+    }
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
+    setSubmitting(true);
+    const result = await login(emailOrUsername.trim(), password);
+    if (!result.ok) {
+      toast.error(result.message || 'Login failed');
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -71,10 +94,10 @@ export default function LoginPage() {
                 id="emailOrUsername"
                 value={emailOrUsername}
                 onChange={(e) => setEmailOrUsername(e.target.value)}
-                required
                 className="block w-full rounded-md border border-zinc-800 bg-zinc-900/50 p-2.5 text-sm text-white placeholder-zinc-500 shadow-sm focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:outline-none transition-all"
                 placeholder="Username or email"
                 />
+                {errors.user && <p className="mt-1 text-xs text-red-400">{errors.user}</p>}
             </div>
 
             {/* Password Input */}
@@ -85,18 +108,19 @@ export default function LoginPage() {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 className="block w-full rounded-md border border-zinc-800 bg-zinc-900/50 p-2.5 text-sm text-white placeholder-zinc-500 shadow-sm focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:outline-none transition-all"
                 placeholder="Password"
                 />
+                {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
             </div>
 
             {/* Submit Button */}
             <button
                 type="submit"
-                className="w-full rounded-md bg-white py-2.5 px-4 text-center text-sm font-medium text-black shadow-lg shadow-zinc-900/20 hover:bg-zinc-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:ring-offset-zinc-950 mt-2"
+                disabled={submitting}
+                className={`w-full rounded-md py-2.5 px-4 text-center text-sm font-medium shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 focus:ring-offset-zinc-950 mt-2 ${submitting ? 'bg-zinc-300 text-zinc-700 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200'}`}
             >
-                Sign in
+                {submitting ? 'Signing in…' : 'Sign in'}
             </button>
             </form>
 

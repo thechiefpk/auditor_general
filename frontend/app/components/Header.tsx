@@ -18,9 +18,9 @@ export default function Header() {
 
   return (
     <header 
-      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? 'bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 py-3' : 'bg-transparent py-5'
-      }`}
+      className={`fixed top-0 left-0 w-full z-50 border-b backdrop-blur-md transition-colors duration-300 ${
+        scrolled ? 'bg-zinc-950/80 border-zinc-800' : 'bg-zinc-950/40 border-transparent'
+      } py-4`}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6">
         {/* Logo */}
