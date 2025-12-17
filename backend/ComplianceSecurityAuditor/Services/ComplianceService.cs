@@ -115,6 +115,33 @@ namespace ComplianceSecurityAuditor.Services
             return summary;
         }
 
+        public async Task<ScanSummary> ScanWithProgressAsync(Guid userid, string path, IScanProgressRepository progressRepo, string jobId, CancellationToken ct = default)
+        {
+            var allViolations = new List<Violation>();
+            var allFiles = _fileScanner.FindFiles(path).ToList();
+            var files = allFiles.Where(f => !ShouldIgnoreFile(f)).ToList();
+            var total = files.Count;
+            var processed = 0;
+            await progressRepo.UpdateAsync(jobId, "Scanning", "Scanning", total, processed, 0, 0);
+            foreach (var file in files)
+            {
+                if (ct.IsCancellationRequested) break;
+                if (await progressRepo.IsCancelRequestedAsync(jobId)) break;
+                var violations = _validationEngine.ScanFile(file);
+                allViolations.AddRange(violations);
+                processed++;
+                var percentage = total == 0 ? 100 : (int)Math.Min(100, Math.Round((double)processed * 100 / total));
+                await progressRepo.UpdateAsync(jobId, "Scanning", "Scanning", total, processed, allViolations.Count, percentage);
+            }
+            var summary = new ScanSummary
+            {
+                FilesScanned = files.Count,
+                ViolationsFound = allViolations.Count,
+                Violations = allViolations
+            };
+            return summary;
+        }
+
         public async Task<Guid> ScanAndSaveAsync(Guid userid, string path)
         {
             var summary = Scan(userid, path);
@@ -150,6 +177,18 @@ namespace ComplianceSecurityAuditor.Services
         {
             if (_repo == null) throw new InvalidOperationException("Repository not configured.");
             return await _repo.GetReportsByUserAsync(userId);
+        }
+
+        public async Task<bool> DeleteReportAsync(Guid userId, Guid reportId)
+        {
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return await _repo.DeleteReportAsync(userId, reportId);
+        }
+
+        public async Task<List<Violation>> GetViolationsAllAsync(Guid reportId)
+        {
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return await _repo.GetViolationsAllAsync(reportId);
         }
     }
 }

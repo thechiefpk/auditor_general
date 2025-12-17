@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using FluentValidation;
 using System.Text;
+using Hangfire;
+using Hangfire.SqlServer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,9 +55,21 @@ builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 // Prefer env var CONNECTION_STRING if present; otherwise use local dev with TrustServerCertificate
 var conn = builder.Configuration["SQL_SERVER_CONNECTION"];
 builder.Services.AddSingleton<ISqlReportRepository>(new SqlReportRepository(conn));
+builder.Services.AddSingleton<IScanProgressRepository>(new SqlScanProgressRepository(conn));
 
 // register ComplianceService with repo
 builder.Services.AddScoped<ComplianceService>(sp => new ComplianceService(sp.GetService<ISqlReportRepository>()));
+builder.Services.AddScoped<ScanJobService>();
+builder.Services.AddScoped<PdfReportService>();
+
+builder.Services.AddHangfire(configuration => configuration
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(conn, new SqlServerStorageOptions
+    {
+        PrepareSchemaIfNecessary = true
+    }));
+builder.Services.AddHangfireServer();
 
 // register auth repository and service
 builder.Services.AddSingleton<IAuthRepository>(new SqlAuthRepository(conn));
@@ -109,6 +123,8 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseHangfireDashboard("/hangfire");
 
 app.MapControllers();
 

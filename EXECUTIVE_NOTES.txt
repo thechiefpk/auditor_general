@@ -2,21 +2,10 @@
 Compliar proj
 -----------------------------------------------------------------------------------------------------------
 -core feature test and build
-	-develop and test scan job scheduling
-		-job mgmt idea finalize
-		-implement with new feature branch
-	-develop report creation and export feature
-		-approach finalize
-		-implement with new feature branch
 	-develop and test git scan
 		-approach finalize
-		-implement with new feature branch
--extended feature buildup
-	-forgot password, dashboard analytics
 	-integrate privado for advance scanning
 	-develop network audit discovery
-	-develop and test drive scan
-	-optional code standards and quality checks
 
 -Final report completion
 -----------------------------------------------------------------------------------------------------------

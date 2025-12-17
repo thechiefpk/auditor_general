@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { API_ENDPOINTS, createAuthHeaders } from '@/app/lib/api';
 import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 // API Response interfaces matching C# backend
 interface AuditRule {
@@ -40,15 +41,19 @@ interface DisplayViolation {
 
 export default function ScanPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [path, setPath] = useState('');
   const [scanType, setScanType] = useState<'local' | 'git'>('local');
   const [gitUrl, setGitUrl] = useState('');
   const [gitBranch, setGitBranch] = useState('');
   const [gitToken, setGitToken] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [progress, setProgress] = useState<{ status: string; stage: string; totalFiles: number; processedFiles: number; violationsFound: number; percentage: number; reportId?: string | null; error?: string | null } | null>(null);
+  const pollTimer = useRef<NodeJS.Timeout | null>(null);
   const [scanResult, setScanResult] = useState<ApiScanSummary | null>(null);
   const [violations, setViolations] = useState<DisplayViolation[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const JOB_STORAGE_KEY = 'currentScanJobId';
 
   // Transform API violations to display format
   const transformViolations = (apiViolations: ApiViolation[]): DisplayViolation[] => {
@@ -73,6 +78,80 @@ export default function ScanPage() {
     return breakdown;
   };
 
+  const startPolling = (jobId: string) => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    pollTimer.current = setInterval(async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.SCAN_PROGRESS(jobId), {
+          headers: createAuthHeaders(user?.token),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const normalized = {
+          status: data.status ?? data.Status,
+          stage: data.stage ?? data.Stage,
+          totalFiles: data.totalFiles ?? data.TotalFiles,
+          processedFiles: data.processedFiles ?? data.ProcessedFiles,
+          violationsFound: data.violationsFound ?? data.ViolationsFound,
+          percentage: data.percentage ?? data.Percentage ?? 0,
+          reportId: data.reportId ?? data.ReportId ?? null,
+          error: data.error ?? data.Error ?? null,
+        };
+        setProgress(normalized);
+        setIsScanning(normalized.status !== 'Completed' && normalized.status !== 'Failed' && normalized.status !== 'Cancelled');
+        
+        if ((normalized.status === 'Completed' || normalized.status === 'Cancelled') && normalized.reportId) {
+          clearInterval(pollTimer.current!);
+          localStorage.removeItem(JOB_STORAGE_KEY);
+          toast.success(normalized.status === 'Cancelled' ? 'Scan cancelled (partial results saved)' : 'Scan completed');
+          router.push(`/dashboard/reports/${normalized.reportId}`);
+        } else if (normalized.status === 'Cancelled') {
+             clearInterval(pollTimer.current!);
+             localStorage.removeItem(JOB_STORAGE_KEY);
+             toast.success('Scan cancelled');
+             setIsScanning(false);
+        }
+        
+        if (normalized.status === 'Failed') {
+          clearInterval(pollTimer.current!);
+          localStorage.removeItem(JOB_STORAGE_KEY);
+          toast.error(normalized.error || 'Scan failed');
+        }
+      } catch {
+      }
+    }, 1500);
+  };
+
+  useEffect(() => {
+    const existing = typeof window !== 'undefined' ? localStorage.getItem(JOB_STORAGE_KEY) : null;
+    if (existing) {
+      setIsScanning(true);
+      startPolling(existing);
+    }
+    return () => {
+      if (pollTimer.current) clearInterval(pollTimer.current);
+    };
+  }, []);
+
+  const cancelScan = async () => {
+    const jobId = localStorage.getItem(JOB_STORAGE_KEY);
+    if (!jobId) return;
+
+    try {
+      const response = await fetch(API_ENDPOINTS.SCAN_CANCEL(jobId), {
+        method: 'POST',
+        headers: createAuthHeaders(user?.token),
+      });
+      if (response.ok) {
+        toast.success('Cancellation requested. Saving partial results...');
+      } else {
+        toast.error('Failed to cancel scan');
+      }
+    } catch {
+      toast.error('Failed to cancel scan');
+    }
+  };
+
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -85,53 +164,34 @@ export default function ScanPage() {
     setShowResults(false);
     setScanResult(null);
     setViolations([]);
+    setProgress(null);
     
     try {
-      console.log('Starting scan for path:', path.trim());
-      console.log('API Endpoint:', API_ENDPOINTS.SCAN);
-      
-      const response = await fetch(API_ENDPOINTS.SCAN, {
+      const response = await fetch(API_ENDPOINTS.SCAN_LOCAL, {
         method: 'POST',
         headers: createAuthHeaders(user?.token),
         body: JSON.stringify({ path: path.trim() }),
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-
-      const data: ApiScanSummary = await response.json();
-      console.log('Response data:', data);
-
+      const data = await response.json();
       if (response.ok) {
-        console.log('Scan successful, setting results...');
-        setScanResult(data);
-        
-        // Transform and set violations from the scan result
-        if (data.violations && data.violations.length > 0) {
-          console.log('Transforming violations:', data.violations.length);
-          const transformedViolations = transformViolations(data.violations);
-          setViolations(transformedViolations);
-          console.log('Violations set:', transformedViolations.length);
-        } else {
-          console.log('No violations found');
-        }
-        
-        setShowResults(true);
-        toast.success(`Scan completed! Found ${data.violationsFound} violations in ${data.filesScanned} files`);
+        const jobId = data.jobId as string;
+        localStorage.setItem(JOB_STORAGE_KEY, jobId);
+        startPolling(jobId);
       } else {
-        console.error('Scan failed:', data);
         toast.error((data as any).error || 'Scan failed');
+        setIsScanning(false);
+        return;
       }
     } catch (error) {
-      console.error('Scan error:', error);
       if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error('Cannot connect to API server. Make sure the backend is running on https://localhost:7120');
       } else {
         toast.error('An error occurred during the scan');
       }
-    } finally {
-      console.log('Setting isScanning to false');
       setIsScanning(false);
+    } finally {
+      // keep isScanning true while polling
     }
   };
 
@@ -147,10 +207,9 @@ export default function ScanPage() {
     setShowResults(false);
     setScanResult(null);
     setViolations([]);
+    setProgress(null);
     
     try {
-      console.log('Starting git scan for:', gitUrl);
-      
       const response = await fetch(API_ENDPOINTS.SCAN_GIT, {
         method: 'POST',
         headers: createAuthHeaders(user?.token),
@@ -161,26 +220,21 @@ export default function ScanPage() {
         }),
       });
 
-      const data: ApiScanSummary = await response.json();
-
+      const data = await response.json();
       if (response.ok) {
-        setScanResult(data);
-        
-        if (data.violations && data.violations.length > 0) {
-          const transformedViolations = transformViolations(data.violations);
-          setViolations(transformedViolations);
-        }
-        
-        setShowResults(true);
-        toast.success(`Scan completed! Found ${data.violationsFound} violations`);
+        const jobId = data.jobId as string;
+        localStorage.setItem(JOB_STORAGE_KEY, jobId);
+        startPolling(jobId);
       } else {
         toast.error((data as any).error || 'Scan failed');
+        setIsScanning(false);
+        return;
       }
     } catch (error) {
-      console.error('Scan error:', error);
       toast.error('An error occurred during the scan');
-    } finally {
       setIsScanning(false);
+    } finally {
+      // keep isScanning true while polling
     }
   };
 
@@ -215,22 +269,24 @@ export default function ScanPage() {
         {/* Tabs */}
         <div className="flex space-x-4 mb-6 border-b border-zinc-800">
           <button
-            onClick={() => setScanType('local')}
+            onClick={() => !isScanning && setScanType('local')}
             className={`pb-2 px-4 font-medium transition-colors ${
               scanType === 'local'
                 ? 'text-white border-b-2 border-white'
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
+            disabled={isScanning}
           >
             Local Scan
           </button>
           <button
-            onClick={() => setScanType('git')}
+            onClick={() => !isScanning && setScanType('git')}
             className={`pb-2 px-4 font-medium transition-colors ${
               scanType === 'git'
                 ? 'text-white border-b-2 border-white'
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
+            disabled={isScanning}
           >
             Git Repository
           </button>
@@ -251,6 +307,7 @@ export default function ScanPage() {
                   id="path"
                   value={path}
                   onChange={(e) => setPath(e.target.value)}
+                  onKeyDown={(e) => { if (isScanning && e.key === 'Enter') e.preventDefault(); }}
                   placeholder="e.g., C:\Projects\MyApp or /home/user/project"
                   className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
                   disabled={isScanning}
@@ -295,6 +352,7 @@ export default function ScanPage() {
                   id="gitUrl"
                   value={gitUrl}
                   onChange={(e) => setGitUrl(e.target.value)}
+                  onKeyDown={(e) => { if (isScanning && e.key === 'Enter') e.preventDefault(); }}
                   placeholder="https://github.com/username/repo.git"
                   className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
                   disabled={isScanning}
@@ -315,6 +373,7 @@ export default function ScanPage() {
                     id="gitBranch"
                     value={gitBranch}
                     onChange={(e) => setGitBranch(e.target.value)}
+                    onKeyDown={(e) => { if (isScanning && e.key === 'Enter') e.preventDefault(); }}
                     placeholder="main"
                     className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
                     disabled={isScanning}
@@ -332,6 +391,7 @@ export default function ScanPage() {
                     id="gitToken"
                     value={gitToken}
                     onChange={(e) => setGitToken(e.target.value)}
+                    onKeyDown={(e) => { if (isScanning && e.key === 'Enter') e.preventDefault(); }}
                     placeholder="ghp_..."
                     className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
                     disabled={isScanning}
@@ -372,11 +432,41 @@ export default function ScanPage() {
             <div className="animate-spin h-8 w-8 border-4 border-zinc-500 border-t-transparent rounded-full"></div>
             <div>
               <h3 className="font-semibold text-white">
-                Scanning in progress...
+                {progress?.stage ? `${progress.stage}...` : 'Scanning in progress...'}
               </h3>
               <p className="text-sm text-zinc-400">
-                Analyzing your codebase for security compliance issues
+                {progress ? `Processed ${progress.processedFiles}/${progress.totalFiles} files • Found ${progress.violationsFound} issues` : 'Analyzing your codebase for security compliance issues'}
               </p>
+              {progress && (
+                <div className="mt-3 w-full bg-zinc-800 rounded-full h-2">
+                  <div className="bg-zinc-200 h-2 rounded-full transition-all" style={{ width: `${progress.percentage}%` }}></div>
+                </div>
+              )}
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const jobId = typeof window !== 'undefined' ? localStorage.getItem(JOB_STORAGE_KEY) : null;
+                    if (!jobId) return;
+                    try {
+                      const res = await fetch(API_ENDPOINTS.SCAN_CANCEL(jobId), {
+                        method: 'POST',
+                        headers: createAuthHeaders(user?.token),
+                      });
+                      if (res.ok) {
+                        toast.success('Cancellation requested');
+                      } else {
+                        toast.error('Failed to request cancellation');
+                      }
+                    } catch {
+                      toast.error('Failed to request cancellation');
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md disabled:bg-red-900 disabled:text-red-300 transition-colors"
+                >
+                  Stop Scan
+                </button>
+              </div>
             </div>
           </div>
         </div>
