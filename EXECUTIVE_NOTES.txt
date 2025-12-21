@@ -2,20 +2,15 @@
 Compliar proj
 -----------------------------------------------------------------------------------------------------------
 -core feature test and build
-	-develop and test git scan
-		-approach finalize
-	-integrate privado for advance scanning
+	-git scan fixups
+	-revise features as per mid-report
 	-develop network audit discovery
+	-test and fix all features
 
 -Final report completion
 -----------------------------------------------------------------------------------------------------------
 
 https://localhost:7120/api/auth/login
 
-{
-  "username": "jack_sparrow",
-  "email": "jack@gmail.com",
-  "password": "pass@jack", "admin123"
-}
-
+jack_sparrow : admin123
 kingslayer@gmail.com : King@123

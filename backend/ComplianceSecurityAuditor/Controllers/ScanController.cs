@@ -60,7 +60,7 @@ namespace ComplianceSecurityAuditor.Controllers
         }
 
         [HttpPost("scan/local")]
-        public IActionResult EnqueueLocalScan([FromBody] ScanRequest request)
+        public async Task<IActionResult> EnqueueLocalScan([FromBody] ScanRequest request)
         {
             if (request is null || string.IsNullOrWhiteSpace(request.Path))
                 return BadRequest(new { error = "Request body must contain a non-empty 'path' field." });
@@ -82,9 +82,19 @@ namespace ComplianceSecurityAuditor.Controllers
             {
                 return BadRequest(new { error = ex.Message });
             }
+
+            if (request.IsAdvanced)
+            {
+                var isDockerRunning = await Utility.IsDockerRunningAsync();
+                if (!isDockerRunning)
+                {
+                     return BadRequest(new { error = "Advanced scan requires Docker to be running. Please start Docker Desktop." });
+                }
+            }
+
             var jobId = Guid.NewGuid().ToString("N");
-            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunLocalScan(jobId, userId, path));
-            _progressRepo.StartAsync(jobId, userId, "Queued", hangId).Wait();
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunLocalScan(jobId, userId, path, request.IsAdvanced));
+            await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
             return Ok(new { jobId });
         }
 
@@ -115,6 +125,16 @@ namespace ComplianceSecurityAuditor.Controllers
         private Guid GetCurrentUserId()
         {
             var user = HttpContext?.User;
+            Console.WriteLine($"[ScanController] IsAuthenticated: {user?.Identity?.IsAuthenticated}");
+            Console.WriteLine($"[ScanController] Identity Name: {user?.Identity?.Name}");
+            Console.WriteLine($"[ScanController] Claims: {string.Join(", ", user?.Claims.Select(c => $"{c.Type}={c.Value}") ?? Array.Empty<string>())}");
+            
+            // Log Headers
+            foreach (var h in HttpContext.Request.Headers)
+            {
+                Console.WriteLine($"[ScanController] Header: {h.Key} = {h.Value}");
+            }
+
             if (user?.Identity?.IsAuthenticated != true)
                 throw new UnauthorizedAccessException();
 
@@ -285,7 +305,7 @@ namespace ComplianceSecurityAuditor.Controllers
         /// <param name="request">Git repository scan request containing URL and optional authentication</param>
         /// <returns>Scan summary with violations found</returns>
         [HttpPost("scan/git")]
-        public IActionResult ScanGitRepository([FromBody] GitScanRequest request)
+        public async Task<IActionResult> ScanGitRepository([FromBody] GitScanRequest request)
         {
             if (request is null || string.IsNullOrWhiteSpace(request.RepositoryUrl))
                 return BadRequest(new { error = "Request body must contain a non-empty 'repositoryUrl' field." });
@@ -307,9 +327,26 @@ namespace ComplianceSecurityAuditor.Controllers
             {
                 return BadRequest(new { error = ex.Message });
             }
+
+            // Verify Git access/credentials
+            var validationResult = ValidateGitAccess(request.RepositoryUrl, request.AccessToken);
+            if (!validationResult.Success)
+            {
+                return BadRequest(new { error = $"Git validation failed: {validationResult.Message}. Please check if the repository is private and provide a valid access token." });
+            }
+
+            if (request.IsAdvanced)
+            {
+                var isDockerRunning = await Utility.IsDockerRunningAsync();
+                if (!isDockerRunning)
+                {
+                     return BadRequest(new { error = "Advanced scan requires Docker to be running. Please start Docker Desktop." });
+                }
+            }
+
             var jobId = Guid.NewGuid().ToString("N");
-            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunGitScan(jobId, userId, request.RepositoryUrl, request.Branch, request.AccessToken));
-            _progressRepo.StartAsync(jobId, userId, "Queued", hangId).Wait();
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunGitScan(jobId, userId, request.RepositoryUrl, request.Branch, request.AccessToken, request.IsAdvanced));
+            await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
             return Ok(new { jobId });
         }
 
@@ -318,6 +355,30 @@ namespace ComplianceSecurityAuditor.Controllers
         {
             var progress = await _progressRepo.GetAsync(jobId);
             if (progress == null) return NotFound();
+
+            // Security check: Ensure the job belongs to the current user
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (progress.UserId != userId)
+                {
+                     return Forbid();
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();
+            }
+
+            // Self-healing: Check for stale jobs (no update for > 2 minutes while in active state)
+            if ((progress.Status == "Cloning" || progress.Status == "Scanning") && 
+                DateTime.UtcNow.Subtract(progress.UpdatedAt).TotalMinutes > 2)
+            {
+                await _progressRepo.FailAsync(jobId, "Scan timed out (no activity detected).");
+                progress.Status = "Failed";
+                progress.Error = "Scan timed out (no activity detected).";
+            }
+
             return Ok(progress);
         }
 
@@ -349,7 +410,43 @@ namespace ComplianceSecurityAuditor.Controllers
             {
                 return Unauthorized(new { error = "Authentication required." });
             }
+            
+            // 1. Request logical cancellation
             await _progressRepo.RequestCancelAsync(jobId);
+
+            // 2. Attempt hard kill of external process if it exists
+            try 
+            {
+                var processId = await _progressRepo.GetProcessIdAsync(jobId);
+                if (processId.HasValue)
+                {
+                    try 
+                    {
+                        var proc = System.Diagnostics.Process.GetProcessById(processId.Value);
+                        // Security check: Verify process name to avoid killing random system processes
+                        // Privado CLI or Docker
+                        var procName = proc.ProcessName.ToLower();
+                        if (procName.Contains("privado") || procName.Contains("docker") || procName.Contains("git"))
+                        {
+                            proc.Kill(true); // Kill entire process tree
+                            Console.WriteLine($"[ScanController] Hard killed process {processId.Value} ({procName}) for job {jobId}");
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // Process already exited
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[ScanController] Failed to kill process {processId.Value}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ScanController] Error during hard cancellation: {ex.Message}");
+            }
+
             return Ok(new { cancelled = true });
         }
 
@@ -379,6 +476,67 @@ namespace ComplianceSecurityAuditor.Controllers
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Validates Git repository access using git ls-remote
+        /// </summary>
+        private (bool Success, string Message) ValidateGitAccess(string repoUrl, string? accessToken)
+        {
+            try
+            {
+                var checkUrl = repoUrl;
+                if (!string.IsNullOrWhiteSpace(accessToken) && repoUrl.StartsWith("https://"))
+                {
+                    var uri = new Uri(repoUrl);
+                    checkUrl = $"https://{accessToken}@{uri.Host}{uri.PathAndQuery}";
+                }
+
+                var processStartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = $"ls-remote \"{checkUrl}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                // Disable interactive prompts and credential helpers
+                processStartInfo.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
+                processStartInfo.EnvironmentVariables["GCM_INTERACTIVE"] = "never";
+
+                // Ensure we don't use global/system config that might have helpers configured
+                // Note: -c credential.helper= overrides any helpers to be empty for this command
+                processStartInfo.Arguments = $"-c credential.helper= ls-remote \"{checkUrl}\"";
+
+                using var process = new Process { StartInfo = processStartInfo };
+                process.Start();
+                
+                // Wait up to 15 seconds for validation
+                var completed = process.WaitForExit(15000);
+                
+                if (!completed)
+                {
+                    process.Kill();
+                    return (false, "Connection timed out");
+                }
+
+                var error = process.StandardError.ReadToEnd();
+                if (process.ExitCode != 0)
+                {
+                    // Clean up error message to avoid exposing tokens if any (though git usually masks them)
+                    // But we constructed the URL with token, so we should be careful.
+                    // The error from git usually says "Authentication failed" or "Repository not found".
+                    return (false, "Access denied or repository not found");
+                }
+
+                return (true, "OK");
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
         }
 
         /// <summary>
@@ -449,8 +607,10 @@ namespace ComplianceSecurityAuditor.Controllers
         public string? Branch { get; set; }
 
         /// <summary>
-        /// Optional: Access token for private repositories
+        /// Optional: Personal Access Token for private repositories
         /// </summary>
         public string? AccessToken { get; set; }
+
+        public bool IsAdvanced { get; set; }
     }
 }

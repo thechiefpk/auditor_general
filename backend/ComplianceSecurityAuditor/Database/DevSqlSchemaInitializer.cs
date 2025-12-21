@@ -1,7 +1,7 @@
 using Microsoft.Data.SqlClient;
 using System.Data;
 
-namespace ComplianceSecurityAuditor.Data
+namespace SecureSoftAPI.Database
 {
 	public static class DevSqlSchemaInitializer
 	{
@@ -131,11 +131,30 @@ END
 							RuleId NVARCHAR(128) NOT NULL,
 							RuleName NVARCHAR(256) NOT NULL,
 							Category NVARCHAR(128) NOT NULL,
+							Severity NVARCHAR(50) NULL,
+							Remediation NVARCHAR(MAX) NULL,
+							ReferenceUrl NVARCHAR(2048) NULL,
 						CONSTRAINT FK_Violations_Reports FOREIGN KEY (ReportId) REFERENCES dbo.Reports(Id) ON DELETE CASCADE
 					);
 					CREATE INDEX IX_Violations_Report ON dbo.Violations(ReportId);
 				END";
 				await using (var cmd = new SqlCommand(createViolations, c)) { await cmd.ExecuteNonQueryAsync(); }
+
+				var updateViolationsSchema = @"
+					IF COL_LENGTH('dbo.Violations', 'Severity') IS NULL
+					BEGIN
+						ALTER TABLE dbo.Violations ADD Severity NVARCHAR(50) NULL;
+					END
+					IF COL_LENGTH('dbo.Violations', 'Remediation') IS NULL
+					BEGIN
+						ALTER TABLE dbo.Violations ADD Remediation NVARCHAR(MAX) NULL;
+					END
+					IF COL_LENGTH('dbo.Violations', 'ReferenceUrl') IS NULL
+					BEGIN
+						ALTER TABLE dbo.Violations ADD ReferenceUrl NVARCHAR(2048) NULL;
+					END
+				";
+				await using (var cmd = new SqlCommand(updateViolationsSchema, c)) { await cmd.ExecuteNonQueryAsync(); }
 
 				var createProc = @"
 IF OBJECT_ID('dbo.sp_CreateUser', 'P') IS NULL

@@ -84,8 +84,18 @@ namespace ComplianceSecurityAuditor.Services
 			var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 			var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()), new Claim(ClaimTypes.Name, username) };
 			foreach (var r in roles) claims.Add(new Claim(ClaimTypes.Role, r));
-			var token = new JwtSecurityToken(claims: claims, expires: DateTime.UtcNow.AddMinutes(30), signingCredentials: creds);
-			return new JwtSecurityTokenHandler().WriteToken(token);
+			
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddMinutes(30),
+                SigningCredentials = creds
+            };
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            var jwt = tokenHandler.WriteToken(token);
+            Console.WriteLine($"Generated Token: {jwt}");
+            return jwt;
 		}
 
 		public async Task<User?> GetUserByIdAsync(Guid id) => await _repo.GetUserByIdAsync(id);

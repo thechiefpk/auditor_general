@@ -47,13 +47,77 @@ export default function ScanPage() {
   const [gitUrl, setGitUrl] = useState('');
   const [gitBranch, setGitBranch] = useState('');
   const [gitToken, setGitToken] = useState('');
+  const [isAdvanced, setIsAdvanced] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [progress, setProgress] = useState<{ status: string; stage: string; totalFiles: number; processedFiles: number; violationsFound: number; percentage: number; reportId?: string | null; error?: string | null } | null>(null);
   const pollTimer = useRef<NodeJS.Timeout | null>(null);
+  const prevStatusRef = useRef<string>('');
   const [scanResult, setScanResult] = useState<ApiScanSummary | null>(null);
   const [violations, setViolations] = useState<DisplayViolation[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const JOB_STORAGE_KEY = 'currentScanJobId';
+
+  // Scan Timer
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState<string>('00:00');
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isScanning && startTime) {
+      interval = setInterval(() => {
+        const now = Date.now();
+        const diff = Math.floor((now - startTime) / 1000);
+        const m = Math.floor(diff / 60).toString().padStart(2, '0');
+        const s = (diff % 60).toString().padStart(2, '0');
+        setElapsedTime(`${m}:${s}`);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isScanning, startTime]);
+  
+  // Docker state
+  const [isDockerRunning, setIsDockerRunning] = useState(false);
+
+  // Check and start Docker on mount
+  useEffect(() => {
+    const checkAndStartDocker = async () => {
+        try {
+            const res = await fetch(API_ENDPOINTS.SYSTEM_DOCKER_STATUS);
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            if (data.isRunning) {
+                setIsDockerRunning(true);
+            } else {
+                setIsDockerRunning(false);
+                // Silent start
+                
+                const startRes = await fetch(API_ENDPOINTS.SYSTEM_START_DOCKER, { method: 'POST' });
+                if (startRes.ok) {
+                    // Poll for status until running
+                    const interval = setInterval(async () => {
+                        try {
+                            const pollRes = await fetch(API_ENDPOINTS.SYSTEM_DOCKER_STATUS);
+                            const pollData = await pollRes.json();
+                            if (pollData.isRunning) {
+                                setIsDockerRunning(true);
+                                clearInterval(interval);
+                            }
+                        } catch {
+                            // ignore poll errors
+                        }
+                    }, 3000);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to check docker status", e);
+        }
+    };
+
+    checkAndStartDocker();
+  }, []);
+
+  // Dynamic storage key based on user
+  const getJobStorageKey = () => user?.username ? `scanJobId_${user.username}` : 'currentScanJobId';
 
   // Transform API violations to display format
   const transformViolations = (apiViolations: ApiViolation[]): DisplayViolation[] => {
@@ -85,6 +149,25 @@ export default function ScanPage() {
         const res = await fetch(API_ENDPOINTS.SCAN_PROGRESS(jobId), {
           headers: createAuthHeaders(user?.token),
         });
+        
+        // Handle unauthorized or not found - stop polling to prevent infinite loops
+        if (res.status === 401 || res.status === 403) {
+            clearInterval(pollTimer.current!);
+            localStorage.removeItem(getJobStorageKey());
+            setIsScanning(false);
+            setStartTime(null);
+            // Don't toast here to avoid spamming on page load if session is stale
+            return;
+        }
+        
+        if (res.status === 404) {
+            clearInterval(pollTimer.current!);
+            localStorage.removeItem(getJobStorageKey());
+            setIsScanning(false);
+            setStartTime(null);
+            return;
+        }
+
         if (!res.ok) return;
         const data = await res.json();
         const normalized = {
@@ -97,25 +180,35 @@ export default function ScanPage() {
           reportId: data.reportId ?? data.ReportId ?? null,
           error: data.error ?? data.Error ?? null,
         };
+        
+        // Check for transition from Cloning to Scanning
+        if (prevStatusRef.current === 'Cloning' && normalized.status === 'Scanning') {
+            toast.success('Cloning complete. Starting scan...');
+        }
+        prevStatusRef.current = normalized.status;
+
         setProgress(normalized);
         setIsScanning(normalized.status !== 'Completed' && normalized.status !== 'Failed' && normalized.status !== 'Cancelled');
         
         if ((normalized.status === 'Completed' || normalized.status === 'Cancelled') && normalized.reportId) {
           clearInterval(pollTimer.current!);
-          localStorage.removeItem(JOB_STORAGE_KEY);
+          localStorage.removeItem(getJobStorageKey());
           toast.success(normalized.status === 'Cancelled' ? 'Scan cancelled (partial results saved)' : 'Scan completed');
+          setStartTime(null);
           router.push(`/dashboard/reports/${normalized.reportId}`);
         } else if (normalized.status === 'Cancelled') {
              clearInterval(pollTimer.current!);
-             localStorage.removeItem(JOB_STORAGE_KEY);
+             localStorage.removeItem(getJobStorageKey());
              toast.success('Scan cancelled');
              setIsScanning(false);
+             setStartTime(null);
         }
         
         if (normalized.status === 'Failed') {
           clearInterval(pollTimer.current!);
-          localStorage.removeItem(JOB_STORAGE_KEY);
+          localStorage.removeItem(getJobStorageKey());
           toast.error(normalized.error || 'Scan failed');
+          setStartTime(null);
         }
       } catch {
       }
@@ -123,7 +216,9 @@ export default function ScanPage() {
   };
 
   useEffect(() => {
-    const existing = typeof window !== 'undefined' ? localStorage.getItem(JOB_STORAGE_KEY) : null;
+    if (!user) return;
+    const key = getJobStorageKey();
+    const existing = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
     if (existing) {
       setIsScanning(true);
       startPolling(existing);
@@ -131,10 +226,10 @@ export default function ScanPage() {
     return () => {
       if (pollTimer.current) clearInterval(pollTimer.current);
     };
-  }, []);
+  }, [user]);
 
   const cancelScan = async () => {
-    const jobId = localStorage.getItem(JOB_STORAGE_KEY);
+    const jobId = localStorage.getItem(getJobStorageKey());
     if (!jobId) return;
 
     try {
@@ -160,7 +255,16 @@ export default function ScanPage() {
       return;
     }
 
+    if (isAdvanced && !isDockerRunning) {
+        toast.error('Docker is not running. Cannot start advanced scan.');
+        // trigger start again just in case
+        fetch(API_ENDPOINTS.SYSTEM_START_DOCKER, { method: 'POST' });
+        return;
+    }
+
     setIsScanning(true);
+    setStartTime(Date.now());
+    setElapsedTime('00:00');
     setShowResults(false);
     setScanResult(null);
     setViolations([]);
@@ -170,13 +274,13 @@ export default function ScanPage() {
       const response = await fetch(API_ENDPOINTS.SCAN_LOCAL, {
         method: 'POST',
         headers: createAuthHeaders(user?.token),
-        body: JSON.stringify({ path: path.trim() }),
+        body: JSON.stringify({ path: path.trim(), isAdvanced }),
       });
 
       const data = await response.json();
       if (response.ok) {
         const jobId = data.jobId as string;
-        localStorage.setItem(JOB_STORAGE_KEY, jobId);
+        localStorage.setItem(getJobStorageKey(), jobId);
         startPolling(jobId);
       } else {
         toast.error((data as any).error || 'Scan failed');
@@ -203,7 +307,16 @@ export default function ScanPage() {
       return;
     }
 
+    if (isAdvanced && !isDockerRunning) {
+        toast.error('Docker is not running. Cannot start advanced scan.');
+        // trigger start again just in case
+        fetch(API_ENDPOINTS.SYSTEM_START_DOCKER, { method: 'POST' });
+        return;
+    }
+
     setIsScanning(true);
+    setStartTime(Date.now());
+    setElapsedTime('00:00');
     setShowResults(false);
     setScanResult(null);
     setViolations([]);
@@ -216,14 +329,15 @@ export default function ScanPage() {
         body: JSON.stringify({ 
           repositoryUrl: gitUrl.trim(),
           branch: gitBranch.trim() || undefined,
-          accessToken: gitToken.trim() || undefined
+          accessToken: gitToken.trim() || undefined,
+          isAdvanced
         }),
       });
 
       const data = await response.json();
       if (response.ok) {
         const jobId = data.jobId as string;
-        localStorage.setItem(JOB_STORAGE_KEY, jobId);
+        localStorage.setItem(getJobStorageKey(), jobId);
         startPolling(jobId);
       } else {
         toast.error((data as any).error || 'Scan failed');
@@ -336,6 +450,25 @@ export default function ScanPage() {
                 Enter the full path to the directory or file you want to scan
               </p>
             </div>
+
+            <div className="flex items-center gap-3 bg-zinc-800/30 p-4 rounded-lg border border-zinc-800">
+              <input
+                type="checkbox"
+                id="advancedLocal"
+                checked={isAdvanced}
+                onChange={(e) => setIsAdvanced(e.target.checked)}
+                className="w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-blue-500 focus:ring-blue-500/20 focus:ring-offset-0"
+                disabled={isScanning}
+              />
+              <div>
+                <label htmlFor="advancedLocal" className="font-medium text-zinc-200 cursor-pointer">
+                  Enable Advanced Deep Scan
+                </label>
+                <p className="text-xs text-zinc-500">
+                  Uses Privado.ai engine to detect data flow and privacy vulnerabilities (slower)
+                </p>
+              </div>
+            </div>
           </form>
         ) : (
           <form onSubmit={handleGitScan} className="space-y-6">
@@ -360,7 +493,7 @@ export default function ScanPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label
                     htmlFor="gitBranch"
@@ -379,23 +512,24 @@ export default function ScanPage() {
                     disabled={isScanning}
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center gap-3 bg-zinc-800/30 p-4 rounded-lg border border-zinc-800">
+                <input
+                  type="checkbox"
+                  id="advancedGit"
+                  checked={isAdvanced}
+                  onChange={(e) => setIsAdvanced(e.target.checked)}
+                  className="w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-blue-500 focus:ring-blue-500/20 focus:ring-offset-0"
+                  disabled={isScanning}
+                />
                 <div>
-                  <label
-                    htmlFor="gitToken"
-                    className="block text-sm font-medium text-zinc-300 mb-2"
-                  >
-                    Access Token (Optional)
+                  <label htmlFor="advancedGit" className="font-medium text-zinc-200 cursor-pointer">
+                    Enable Advanced Deep Scan
                   </label>
-                  <input
-                    type="password"
-                    id="gitToken"
-                    value={gitToken}
-                    onChange={(e) => setGitToken(e.target.value)}
-                    onKeyDown={(e) => { if (isScanning && e.key === 'Enter') e.preventDefault(); }}
-                    placeholder="ghp_..."
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
-                    disabled={isScanning}
-                  />
+                  <p className="text-xs text-zinc-500">
+                    Uses Privado.ai engine to detect data flow and privacy vulnerabilities (slower)
+                  </p>
                 </div>
               </div>
 
@@ -408,7 +542,7 @@ export default function ScanPage() {
                   {isScanning ? (
                     <>
                       <div className="animate-spin h-5 w-5 border-2 border-black border-t-transparent rounded-full"></div>
-                      Cloning & Scanning...
+                      {progress?.status === 'Cloning' ? 'Cloning Repository...' : 'Scanning...'}
                     </>
                   ) : (
                     <>
@@ -431,13 +565,22 @@ export default function ScanPage() {
           <div className="flex items-center gap-4">
             <div className="animate-spin h-8 w-8 border-4 border-zinc-500 border-t-transparent rounded-full"></div>
             <div>
-              <h3 className="font-semibold text-white">
-                {progress?.stage ? `${progress.stage}...` : 'Scanning in progress...'}
-              </h3>
-              <p className="text-sm text-zinc-400">
-                {progress ? `Processed ${progress.processedFiles}/${progress.totalFiles} files • Found ${progress.violationsFound} issues` : 'Analyzing your codebase for security compliance issues'}
+              <div className="flex justify-between items-center">
+                  <h3 className="font-semibold text-white">
+                    {progress?.status === 'Cloning' ? 'Cloning Repository...' : (progress?.stage ? `${progress.stage}...` : 'Scanning in progress...')}
+                  </h3>
+                  {startTime && (
+                    <span className="text-sm font-mono text-zinc-400 bg-zinc-800/50 px-2 py-1 rounded">
+                        {elapsedTime}
+                    </span>
+                  )}
+              </div>
+              <p className="text-sm text-zinc-400 mt-1">
+                {progress?.status === 'Cloning' 
+                  ? 'Please wait while we clone the repository...' 
+                  : (progress ? `Processed ${progress.processedFiles}/${progress.totalFiles} files • Found ${progress.violationsFound} issues` : 'Analyzing your codebase for security compliance issues')}
               </p>
-              {progress && (
+              {progress && progress.status !== 'Cloning' && (
                 <div className="mt-3 w-full bg-zinc-800 rounded-full h-2">
                   <div className="bg-zinc-200 h-2 rounded-full transition-all" style={{ width: `${progress.percentage}%` }}></div>
                 </div>
@@ -446,7 +589,7 @@ export default function ScanPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    const jobId = typeof window !== 'undefined' ? localStorage.getItem(JOB_STORAGE_KEY) : null;
+                    const jobId = typeof window !== 'undefined' ? localStorage.getItem(getJobStorageKey()) : null;
                     if (!jobId) return;
                     try {
                       const res = await fetch(API_ENDPOINTS.SCAN_CANCEL(jobId), {

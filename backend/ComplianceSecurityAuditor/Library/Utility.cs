@@ -1,4 +1,8 @@
-﻿namespace ComplianceSecurityAuditor.Library
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace ComplianceSecurityAuditor.Library
 {
 	public class Utility
 	{
@@ -22,5 +26,41 @@
 				return string.Empty;
 			}
 		}
+
+        public static async Task<bool> IsDockerRunningAsync()
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "docker",
+                    Arguments = "info",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = new Process { StartInfo = psi };
+                process.Start();
+                
+                // Give it a short timeout
+                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                try 
+                {
+                    await process.WaitForExitAsync(cts.Token);
+                    return process.ExitCode == 0;
+                }
+                catch (OperationCanceledException)
+                {
+                    process.Kill();
+                    return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
 	}
 }

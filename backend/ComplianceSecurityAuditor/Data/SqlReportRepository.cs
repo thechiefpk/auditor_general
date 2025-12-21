@@ -87,8 +87,8 @@ VALUES(@UserId, @Path, @FilesScanned, @ViolationsFound, @CreatedAt)", conn, tran
 				// --- No changes needed for violations ---
 				foreach (var v in summary.Violations)
 				{
-					var vcmd = new SqlCommand(@"INSERT INTO Violations(ReportId, FilePath, LineNumber, MatchedText, RuleId, RuleName, Category)
-VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Category)", conn, tran);
+					var vcmd = new SqlCommand(@"INSERT INTO Violations(ReportId, FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Description, Severity, Remediation, ReferenceUrl)
+VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Category, @Description, @Severity, @Remediation, @ReferenceUrl)", conn, tran);
 					vcmd.Parameters.AddWithValue("@ReportId", id);
 					vcmd.Parameters.AddWithValue("@FilePath", v.FilePath);
 					vcmd.Parameters.AddWithValue("@LineNumber", v.LineNumber);
@@ -96,6 +96,10 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 					vcmd.Parameters.AddWithValue("@RuleId", v.ViolatedRule.RuleId);
 					vcmd.Parameters.AddWithValue("@RuleName", v.ViolatedRule.Name);
 					vcmd.Parameters.AddWithValue("@Category", v.ViolatedRule.Category);
+					vcmd.Parameters.AddWithValue("@Description", v.ViolatedRule.Description ?? (object)DBNull.Value);
+					vcmd.Parameters.AddWithValue("@Severity", v.ViolatedRule.Severity.ToString());
+					vcmd.Parameters.AddWithValue("@Remediation", v.ViolatedRule.Remediation ?? (object)DBNull.Value);
+					vcmd.Parameters.AddWithValue("@ReferenceUrl", v.ViolatedRule.ReferenceUrl ?? (object)DBNull.Value);
 					await vcmd.ExecuteNonQueryAsync();
 				}
 
@@ -254,7 +258,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 			await reader.CloseAsync();
 
 			// Read violations
-			var vcmd = new SqlCommand("SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category FROM Violations WHERE ReportId = @Id ORDER BY FilePath, LineNumber", conn);
+			var vcmd = new SqlCommand("SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description FROM Violations WHERE ReportId = @Id ORDER BY FilePath, LineNumber", conn);
 			vcmd.Parameters.AddWithValue("@Id", reportId);
 			using var vreader = await vcmd.ExecuteReaderAsync();
 			while (await vreader.ReadAsync())
@@ -265,8 +269,13 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 				var ruleId = vreader.GetString(3);
 				var ruleName = vreader.GetString(4);
 				var category = vreader.GetString(5);
+				var severityStr = vreader.IsDBNull(6) ? "Medium" : vreader.GetString(6);
+				Enum.TryParse(severityStr, out AuditSeverity severity);
+				var remediation = vreader.IsDBNull(7) ? string.Empty : vreader.GetString(7);
+				var refUrl = vreader.IsDBNull(8) ? null : vreader.GetString(8);
+				var description = vreader.IsDBNull(9) ? string.Empty : vreader.GetString(9);
 
-				var rule = new AuditRule(ruleId, ruleName, category, string.Empty, null!);
+				var rule = new AuditRule(ruleId, ruleName, category, description, severity, remediation, refUrl, null!);
 				var violation = new Violation(file, line, matched, rule);
 				summary.Violations.Add(violation);
 			}
@@ -315,7 +324,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 			};
 			var dir = sortDir?.ToLowerInvariant() == "desc" ? "DESC" : "ASC";
 
-			var qText = $@"SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category FROM Violations {where} ORDER BY {safeSort} {dir} OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+			var qText = $@"SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description FROM Violations {where} ORDER BY {safeSort} {dir} OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 			var fetchCmd = new SqlCommand(qText, conn);
 			foreach (SqlParameter p in cmd.Parameters) fetchCmd.Parameters.Add(p.ParameterName, p.SqlDbType).Value = p.Value;
 			fetchCmd.Parameters.AddWithValue("@Offset", offset);
@@ -330,8 +339,13 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 				var ruleId = reader.GetString(3);
 				var ruleName = reader.GetString(4);
 				var fileCategory = reader.GetString(5);
+				var severityStr = reader.IsDBNull(6) ? "Medium" : reader.GetString(6);
+				Enum.TryParse(severityStr, out AuditSeverity severity);
+				var remediation = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
+				var refUrl = reader.IsDBNull(8) ? null : reader.GetString(8);
+				var description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9);
 
-				var rule = new AuditRule(ruleId, ruleName, fileCategory, string.Empty, null!);
+				var rule = new AuditRule(ruleId, ruleName, fileCategory, description, severity, remediation, refUrl, null!);
 				var violation = new Violation(file, line, matched, rule);
 				result.Items.Add(violation);
 			}
@@ -384,7 +398,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 
 			// Fetch violations for all reportIds in one query
 			var idsParam = string.Join(",", reportIds.Select((_, idx) => "@id" + idx));
-			var vcmdText = $@"SELECT ReportId, FilePath, LineNumber, MatchedText, RuleId, RuleName, Category
+			var vcmdText = $@"SELECT ReportId, FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description
 							  FROM Violations
 							  WHERE ReportId IN ({idsParam})
 							  ORDER BY ReportId, FilePath, LineNumber";
@@ -406,8 +420,13 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 				var ruleId = vreader.GetString(4);
 				var ruleName = vreader.GetString(5);
 				var category = vreader.GetString(6);
+				var severityStr = vreader.IsDBNull(7) ? "Medium" : vreader.GetString(7);
+				Enum.TryParse(severityStr, out AuditSeverity severity);
+				var remediation = vreader.IsDBNull(8) ? string.Empty : vreader.GetString(8);
+				var refUrl = vreader.IsDBNull(9) ? null : vreader.GetString(9);
+				var description = vreader.IsDBNull(10) ? string.Empty : vreader.GetString(10);
 
-				var rule = new AuditRule(ruleId, ruleName, category, string.Empty, null!);
+				var rule = new AuditRule(ruleId, ruleName, category, description, severity, remediation, refUrl, null!);
 				var violation = new Violation(file, line, matched, rule);
 
 				if (!violationsByReport.TryGetValue(rid, out var listFor))
@@ -456,7 +475,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 			await conn.OpenAsync();
 
 			var list = new List<Violation>();
-			var q = @"SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category 
+			var q = @"SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description 
 					  FROM Violations 
 					  WHERE ReportId = @Id 
 					  ORDER BY FilePath, LineNumber";
@@ -472,7 +491,13 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 				var ruleId = reader.GetString(3);
 				var ruleName = reader.GetString(4);
 				var category = reader.GetString(5);
-				var rule = new AuditRule(ruleId, ruleName, category, string.Empty, null!);
+				var severityStr = reader.IsDBNull(6) ? "Medium" : reader.GetString(6);
+				Enum.TryParse(severityStr, out AuditSeverity severity);
+				var remediation = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
+				var refUrl = reader.IsDBNull(8) ? null : reader.GetString(8);
+				var description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9);
+
+				var rule = new AuditRule(ruleId, ruleName, category, description, severity, remediation, refUrl, null!);
 				list.Add(new Violation(file, line, matched, rule));
 			}
 
