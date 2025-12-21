@@ -1,4 +1,4 @@
-﻿
+
 namespace ComplianceSecurityAuditor.Library
 {
 	/// <summary>
@@ -6,12 +6,34 @@ namespace ComplianceSecurityAuditor.Library
 	/// </summary>
 	public class FileScanner
 	{
-		// Define directories and extensions to ignore during the scan.
-		private static readonly HashSet<string> DirsToIgnore = new(StringComparer.OrdinalIgnoreCase)
-			{ ".git", "node_modules", "bin", "obj" };
+		// Whitelist of allowed high-level language extensions
+		private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+		{
+			".cs", ".java", ".py", ".go", ".rb", ".php", ".swift", 
+			".kt", ".kts", ".rs", ".c", ".cpp", ".h", ".hpp", 
+			".ts", ".tsx", ".jsx", ".sql", ".scala", ".pl", ".sh", ".bat", ".ps1" 
+			// Note: .js is handled specially to exclude .min.js
+		};
 
-		private static readonly HashSet<string> ExtsToIgnore = new(StringComparer.OrdinalIgnoreCase)
-			{ ".dll", ".exe", ".png", ".jpg", ".zip", ".pack" };
+		// Directories to strictly ignore
+		private static readonly HashSet<string> DirsToIgnore = new(StringComparer.OrdinalIgnoreCase)
+		{ 
+			".git", ".vs", ".idea", ".vscode",
+			"node_modules", "bower_components", "jspm_packages",
+			"bin", "obj", "debug", "release", "debugger",
+			"dist", "build", "out", "target",
+			"coverage", "test-results", "test", "tests", "spec", "specs", "tmp", "temp",
+			"vendor", "plugins", "storage",
+			"assets", "static", "images", "img", "fonts", "css", "scss", "less", "sass",
+			"lib", "libs" // Often 3rd party
+		};
+
+		// Specific file names to ignore
+		private static readonly HashSet<string> FilesToIgnore = new(StringComparer.OrdinalIgnoreCase)
+		{
+			"package-lock.json", "yarn.lock", "composer.lock", "Gemfile.lock",
+			"jquery.js", "jquery.min.js", "angular.js", "react.js", "vue.js" // Common libs
+		};
 
 		/// <summary>
 		/// Recursively finds all relevant files in a directory.
@@ -47,7 +69,8 @@ namespace ComplianceSecurityAuditor.Library
 
 				foreach (var subDir in subDirs)
 				{
-					if (!DirsToIgnore.Contains(Path.GetFileName(subDir)))
+					var dirName = Path.GetFileName(subDir);
+					if (!DirsToIgnore.Contains(dirName))
 						queue.Enqueue(subDir);
 				}
 
@@ -65,10 +88,30 @@ namespace ComplianceSecurityAuditor.Library
 
 				foreach (var file in files)
 				{
-					if (!ExtsToIgnore.Contains(Path.GetExtension(file)))
+					if (IsAllowedFile(file))
 						yield return file;
 				}
 			}
+		}
+
+		private bool IsAllowedFile(string filePath)
+		{
+			var fileName = Path.GetFileName(filePath);
+			var extension = Path.GetExtension(filePath);
+
+			// Check strict file name ignores
+			if (FilesToIgnore.Contains(fileName)) return false;
+
+			// Check for minified files
+			if (fileName.EndsWith(".min.js", StringComparison.OrdinalIgnoreCase) || 
+				fileName.EndsWith(".min.css", StringComparison.OrdinalIgnoreCase)) 
+				return false;
+
+			// Special handling for JS files (allow .js but not .min.js, which is handled above)
+			if (string.Equals(extension, ".js", StringComparison.OrdinalIgnoreCase)) return true;
+
+			// Check whitelist
+			return AllowedExtensions.Contains(extension);
 		}
 	}
 }

@@ -1,5 +1,5 @@
 // API Configuration
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7120';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5059';
 
 export const API_ENDPOINTS = {
   // Auth endpoints
@@ -20,6 +20,10 @@ export const API_ENDPOINTS = {
   REPORT_PDF: (id: string) => `${API_BASE_URL}/api/report/${id}/export/pdf`,
   STATS: (id: string) => `${API_BASE_URL}/api/stats/${id}`,
   VIOLATIONS: (id: string) => `${API_BASE_URL}/api/report/${id}/violations`,
+
+  // System endpoints
+  SYSTEM_DOCKER_STATUS: `${API_BASE_URL}/api/system/docker-status`,
+  SYSTEM_START_DOCKER: `${API_BASE_URL}/api/system/start-docker`,
 };
 
 // Helper function to create headers with auth token

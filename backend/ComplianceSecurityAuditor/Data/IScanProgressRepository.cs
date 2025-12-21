@@ -12,6 +12,8 @@ namespace ComplianceSecurityAuditor.Data
         Task<ScanProgress?> GetAsync(string jobId);
         Task RequestCancelAsync(string jobId);
         Task<bool> IsCancelRequestedAsync(string jobId);
+        Task UpdateProcessIdAsync(string jobId, int processId);
+        Task<int?> GetProcessIdAsync(string jobId);
         Task<int> GetActiveCountAsync(Guid userId);
         Task MarkCancelledAsync(string jobId, Guid reportId);
     }

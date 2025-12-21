@@ -8,6 +8,7 @@ using FluentValidation;
 using System.Text;
 using Hangfire;
 using Hangfire.SqlServer;
+using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +60,7 @@ builder.Services.AddSingleton<IScanProgressRepository>(new SqlScanProgressReposi
 
 // register ComplianceService with repo
 builder.Services.AddScoped<ComplianceService>(sp => new ComplianceService(sp.GetService<ISqlReportRepository>()));
+builder.Services.AddScoped<PrivadoScanner>();
 builder.Services.AddScoped<ScanJobService>();
 builder.Services.AddScoped<PdfReportService>();
 
@@ -77,7 +79,15 @@ builder.Services.AddScoped<AuthService>();
 
 // JWT configuration - use environment variable 'JWT_SECRET' or a fallback (dev only)
 var jwtSecret = builder.Configuration["JWT_SECRET"];
-var key = Encoding.ASCII.GetBytes(jwtSecret);
+if (string.IsNullOrEmpty(jwtSecret))
+{
+    Console.WriteLine("CRITICAL: JWT_SECRET is null or empty!");
+}
+else
+{
+    Console.WriteLine($"JWT_SECRET found, length: {jwtSecret.Length}");
+}
+var key = Encoding.ASCII.GetBytes(jwtSecret ?? "default_secret_should_be_long_enough_for_hmacsha256");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -96,21 +106,50 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key),
         ClockSkew = TimeSpan.Zero
     };
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            Console.WriteLine("Token validated successfully.");
+            return Task.CompletedTask;
+        },
+        OnMessageReceived = context =>
+        {
+            Console.WriteLine($"Token received: {context.Token?.Substring(0, Math.Min(10, context.Token?.Length ?? 0))}...");
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            Console.WriteLine($"OnChallenge: {context.Error}, {context.ErrorDescription}, {context.AuthenticateFailure?.Message}");
+            return Task.CompletedTask;
+        }
+    };
 });
 
 var app = builder.Build();
 
-// Dev-only: ensure SQL schema exists
-if (app.Environment.IsDevelopment())
+// Cleanup stuck jobs on startup
+try
 {
-    await DevSqlSchemaInitializer.EnsureAsync(conn);
+    using (var connection = new SqlConnection(conn))
+    {
+        connection.Open();
+        var command = new SqlCommand("UPDATE ScanProgress SET Status = 'Failed', Error = 'Server restarted' WHERE Status IN ('Cloning', 'Scanning')", connection);
+        command.ExecuteNonQuery();
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Error cleaning up stuck jobs: {ex.Message}");
 }
 
 // Use CORS before routing/controllers
 app.UseCors("AllowFrontend");
-
-// After app is built
-app.UseCors("AllowLocalhost");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -119,7 +158,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();

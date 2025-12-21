@@ -15,6 +15,7 @@ interface User {
 // 2. Define the shape of the context value
 interface AuthContextType {
   user: User | null;
+  isLoading: boolean;
   login: (username: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   logout: () => void;
   signup: (username: string, email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
@@ -30,6 +31,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (token) {
       setUser({ token, username }); 
     }
+    setIsLoading(false);
   }, []);
 
   // 5. Login Function
@@ -107,7 +110,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // 8. Provide the context value
   return (
-    <AuthContext.Provider value={{ user, login, logout, signup }}> {/* <-- ADDED signup */}
+    <AuthContext.Provider value={{ user, isLoading, login, logout, signup }}> {/* <-- ADDED signup */}
       {children}
     </AuthContext.Provider>
   );

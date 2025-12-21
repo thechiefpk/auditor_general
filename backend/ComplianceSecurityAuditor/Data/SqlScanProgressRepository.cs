@@ -119,6 +119,29 @@ WHEN NOT MATCHED THEN
             return result is bool b && b;
         }
 
+        public async Task UpdateProcessIdAsync(string jobId, int processId)
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+            var q = @"UPDATE dbo.ScanProgress SET ProcessId = @ProcessId WHERE JobId=@JobId";
+            await using var cmd = new SqlCommand(q, conn);
+            cmd.Parameters.Add(new SqlParameter("@JobId", SqlDbType.NVarChar, 64) { Value = jobId });
+            cmd.Parameters.Add(new SqlParameter("@ProcessId", SqlDbType.Int) { Value = processId });
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task<int?> GetProcessIdAsync(string jobId)
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+            var q = @"SELECT ProcessId FROM dbo.ScanProgress WHERE JobId=@JobId";
+            await using var cmd = new SqlCommand(q, conn);
+            cmd.Parameters.Add(new SqlParameter("@JobId", SqlDbType.NVarChar, 64) { Value = jobId });
+            var result = await cmd.ExecuteScalarAsync();
+            if (result == null || result == DBNull.Value) return null;
+            return (int)result;
+        }
+
         public async Task<int> GetActiveCountAsync(Guid userId)
         {
             await using var conn = new SqlConnection(_connectionString);

@@ -10,39 +10,6 @@ namespace ComplianceSecurityAuditor.Services
         private readonly ValidationEngine _validationEngine;
         private readonly ISqlReportRepository _repo;
 
-        // Files and patterns to ignore during scanning
-        private readonly HashSet<string> _ignoredFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ".gitignore",
-            ".git",
-            ".vs",
-            ".idea",
-            "node_modules"
-        };
-
-        private readonly HashSet<string> _ignoredExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ".db",
-            ".sqlite",
-            ".lock",
-            ".log",
-            ".DB",
-            ".dbmdl",
-            ".sqlproj",
-            ".sln"
-        };
-
-        private readonly List<string> _ignoredPathPatterns = new List<string>
-        {
-            "\\.vs\\",
-            "\\node_modules\\",
-            "\\bin\\",
-            "\\obj\\",
-            "\\.git\\",
-            "CopilotIndices",
-            "CodeChunks"
-        };
-
         public ComplianceService(ISqlReportRepository repo = null)
         {
             _fileScanner = new FileScanner();
@@ -51,36 +18,11 @@ namespace ComplianceSecurityAuditor.Services
             _repo = repo;
         }
 
-        private bool ShouldIgnoreFile(string filePath)
-        {
-            var fileName = Path.GetFileName(filePath);
-            var extension = Path.GetExtension(filePath);
-
-            // Check if filename should be ignored
-            if (_ignoredFileNames.Contains(fileName))
-                return true;
-
-            // Check if extension should be ignored
-            if (_ignoredExtensions.Contains(extension))
-                return true;
-
-            // Check if path contains ignored patterns
-            foreach (var pattern in _ignoredPathPatterns)
-            {
-                if (filePath.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            return false;
-        }
-
         public ScanSummary Scan(Guid userid, string path)
         {
             var allViolations = new List<Violation>();
-            var allFiles = _fileScanner.FindFiles(path).ToList();
-
-            // Filter out ignored files
-            var files = allFiles.Where(f => !ShouldIgnoreFile(f)).ToList();
+            // FileScanner now handles all filtering (ignore lists, allowed extensions)
+            var files = _fileScanner.FindFiles(path).ToList();
 
             foreach (var file in files)
             {
@@ -118,20 +60,42 @@ namespace ComplianceSecurityAuditor.Services
         public async Task<ScanSummary> ScanWithProgressAsync(Guid userid, string path, IScanProgressRepository progressRepo, string jobId, CancellationToken ct = default)
         {
             var allViolations = new List<Violation>();
-            var allFiles = _fileScanner.FindFiles(path).ToList();
-            var files = allFiles.Where(f => !ShouldIgnoreFile(f)).ToList();
+            // FileScanner now handles all filtering
+            var files = _fileScanner.FindFiles(path).ToList();
+            
             var total = files.Count;
             var processed = 0;
+            var percentage = 0;
             await progressRepo.UpdateAsync(jobId, "Scanning", "Scanning", total, processed, 0, 0);
+            
+            var lastUpdate = DateTime.UtcNow;
             foreach (var file in files)
             {
                 if (ct.IsCancellationRequested) break;
+                
+                // Check cancellation from DB
                 if (await progressRepo.IsCancelRequestedAsync(jobId)) break;
+
+                // Check for activity timeout (if loop gets stuck on a single file for > 2 mins, unlikely but good safety)
+                if (DateTime.UtcNow.Subtract(lastUpdate).TotalMinutes > 2)
+                {
+                    // Update heartbeat to prevent stale job detection killing us if we are just slow on a huge file
+                    await progressRepo.UpdateAsync(jobId, "Scanning", "Scanning", total, processed, allViolations.Count, percentage);
+                    lastUpdate = DateTime.UtcNow;
+                }
+
                 var violations = _validationEngine.ScanFile(file);
                 allViolations.AddRange(violations);
                 processed++;
-                var percentage = total == 0 ? 100 : (int)Math.Min(100, Math.Round((double)processed * 100 / total));
-                await progressRepo.UpdateAsync(jobId, "Scanning", "Scanning", total, processed, allViolations.Count, percentage);
+                var newPercentage = total == 0 ? 100 : (int)Math.Min(100, Math.Round((double)processed * 100 / total));
+                
+                // Update progress every 1% or every 50 files or if percentage changed
+                if (newPercentage > percentage || processed % 50 == 0)
+                {
+                    percentage = newPercentage;
+                    await progressRepo.UpdateAsync(jobId, "Scanning", "Scanning", total, processed, allViolations.Count, percentage);
+                    lastUpdate = DateTime.UtcNow;
+                }
             }
             var summary = new ScanSummary
             {
