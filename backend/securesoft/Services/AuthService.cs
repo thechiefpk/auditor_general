@@ -88,7 +88,7 @@ namespace ComplianceSecurityAuditor.Services
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(30),
+                Expires = DateTime.UtcNow.AddHours(2), // Extended to 2 hours
                 SigningCredentials = creds
             };
             var tokenHandler = new JwtSecurityTokenHandler();

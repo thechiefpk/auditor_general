@@ -12,5 +12,6 @@ namespace ComplianceSecurityAuditor.Data
 		Task<List<ScanSummary>> GetReportsByUserAsync(Guid userId);
 		Task<bool> DeleteReportAsync(Guid userId, Guid reportId);
 		Task<List<Violation>> GetViolationsAllAsync(Guid reportId);
+		Task<List<DailyStat>> GetDailyStatsAsync(Guid userId);
 	}
 }

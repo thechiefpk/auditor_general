@@ -503,5 +503,47 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 
 			return list;
 		}
+
+		public async Task<List<DailyStat>> GetDailyStatsAsync(Guid userId)
+		{
+			using var conn = new SqlConnection(_connectionString);
+			await conn.OpenAsync();
+
+			var list = new List<DailyStat>();
+			// Group by day
+			var q = @"
+				SELECT 
+					CAST(CreatedAt AS DATE) as Day, 
+					COUNT(*) as ScanCount, 
+					SUM(ViolationsFound) as ViolationCount
+				FROM Reports
+				WHERE UserId = @UserId
+				GROUP BY CAST(CreatedAt AS DATE)
+				ORDER BY Day ASC";
+
+			var cmd = new SqlCommand(q, conn);
+			cmd.Parameters.AddWithValue("@UserId", userId);
+
+			using var reader = await cmd.ExecuteReaderAsync();
+			while (await reader.ReadAsync())
+			{
+				var day = reader.GetDateTime(0);
+				var scanCount = reader.GetInt32(1);
+				var violationCount = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
+
+				// Arbitrary formula: $100 saved per violation found
+				var saved = violationCount * 100m;
+
+				list.Add(new DailyStat
+				{
+					Date = day.ToString("yyyy-MM-dd"),
+					ScanCount = scanCount,
+					ViolationCount = violationCount,
+					DollarsSaved = saved
+				});
+			}
+
+			return list;
+		}
 	}
 }

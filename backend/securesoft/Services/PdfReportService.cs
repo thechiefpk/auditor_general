@@ -4,6 +4,8 @@ using QuestPDF.Infrastructure;
 using SkiaSharp;
 using ComplianceSecurityAuditor.Models;
 
+using SecureSoftAPI.Models; // Add this namespace
+
 namespace ComplianceSecurityAuditor.Services
 {
     public class PdfReportService
@@ -12,6 +14,143 @@ namespace ComplianceSecurityAuditor.Services
         {
             // Configure license
             QuestPDF.Settings.License = LicenseType.Community;
+        }
+
+        public byte[] GenerateNetworkReport(NetworkScanResult result)
+        {
+             var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Margin(50);
+                    page.Size(PageSizes.A4);
+                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
+
+                    page.Header().Element(c => ComposeNetworkHeader(c, result));
+                    
+                    page.Content().PaddingVertical(20).Column(column =>
+                    {
+                        column.Spacing(20);
+
+                        // 1. Overview
+                        column.Item().Element(c => ComposeNetworkOverview(c, result));
+
+                        // 2. Open Ports
+                        column.Item().Element(c => ComposeOpenPorts(c, result));
+
+                        // 3. Security Headers
+                        column.Item().Element(c => ComposeSecurityHeaders(c, result));
+
+                        // 4. PII Findings
+                        column.Item().Element(c => ComposePiiFindings(c, result));
+                    });
+
+                    page.Footer().AlignCenter().Text(x =>
+                    {
+                        x.Span("Page ");
+                        x.CurrentPageNumber();
+                        x.Span(" of ");
+                        x.TotalPages();
+                    });
+                });
+            });
+
+            return document.GeneratePdf();
+        }
+
+        void ComposeNetworkHeader(IContainer container, NetworkScanResult result)
+        {
+            var titleStyle = TextStyle.Default.FontSize(24).SemiBold().FontColor(Colors.Blue.Medium);
+
+            container.Row(row =>
+            {
+                row.RelativeItem().Column(column =>
+                {
+                    column.Item().Text("Network Security Audit").Style(titleStyle);
+                    column.Item().Text(text =>
+                    {
+                        text.Span("Target: ").SemiBold();
+                        text.Span(result.Url);
+                    });
+                    column.Item().Text(text =>
+                    {
+                        text.Span("Scan Date: ").SemiBold();
+                        text.Span($"{result.CreatedAt:g}");
+                    });
+                });
+            });
+        }
+
+        void ComposeNetworkOverview(IContainer container, NetworkScanResult result)
+        {
+            container.Column(column =>
+            {
+                column.Item().Text("Executive Summary").FontSize(16).SemiBold().FontColor(Colors.Grey.Darken2);
+                column.Item().PaddingTop(5).Text($"Security Score: {result.SecurityScore}/100").FontSize(14).Bold()
+                    .FontColor(result.SecurityScore >= 90 ? Colors.Green.Medium : result.SecurityScore < 60 ? Colors.Red.Medium : Colors.Orange.Medium);
+                
+                column.Item().PaddingTop(5).Text($"Status: {result.StatusCode} {result.StatusReason}");
+            });
+        }
+
+        void ComposeOpenPorts(IContainer container, NetworkScanResult result)
+        {
+            container.Column(column =>
+            {
+                column.Item().Text("Open Ports & Services").FontSize(16).SemiBold().FontColor(Colors.Grey.Darken2);
+                
+                if (result.OpenPorts.Count == 0)
+                {
+                    column.Item().PaddingTop(5).Text("No common open ports detected.");
+                }
+                else
+                {
+                    foreach (var port in result.OpenPorts)
+                    {
+                        column.Item().PaddingTop(2).Text($"• Port {port} (OPEN) - Potential exposure point.");
+                    }
+                }
+            });
+        }
+
+        void ComposeSecurityHeaders(IContainer container, NetworkScanResult result)
+        {
+            container.Column(column =>
+            {
+                column.Item().Text("Security Headers").FontSize(16).SemiBold().FontColor(Colors.Grey.Darken2);
+                
+                if (result.MissingSecurityHeaders.Count == 0)
+                {
+                    column.Item().PaddingTop(5).Text("All critical security headers are present.").FontColor(Colors.Green.Medium);
+                }
+                else
+                {
+                    foreach (var header in result.MissingSecurityHeaders)
+                    {
+                        column.Item().PaddingTop(2).Text($"• Missing: {header}").FontColor(Colors.Red.Medium);
+                    }
+                }
+            });
+        }
+
+        void ComposePiiFindings(IContainer container, NetworkScanResult result)
+        {
+            container.Column(column =>
+            {
+                column.Item().Text("PII & Sensitive Data").FontSize(16).SemiBold().FontColor(Colors.Grey.Darken2);
+                
+                if (result.PiiFindings.Count == 0)
+                {
+                    column.Item().PaddingTop(5).Text("No PII patterns detected in public response.");
+                }
+                else
+                {
+                    foreach (var finding in result.PiiFindings)
+                    {
+                        column.Item().PaddingTop(2).Text($"• {finding}").FontColor(Colors.Red.Medium);
+                    }
+                }
+            });
         }
 
         public byte[] GenerateReport(ScanStatistics stats)

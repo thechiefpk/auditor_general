@@ -98,6 +98,43 @@ export default function ReportDetailsPage() {
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Report ID copied to clipboard');
+  };
+
+  const handleExport = async (format: 'csv' | 'pdf') => {
+    if (!report) return;
+    
+    const url = format === 'csv' 
+        ? API_ENDPOINTS.REPORT_CSV(report.reportId)
+        : API_ENDPOINTS.REPORT_PDF(report.reportId);
+        
+    const toastId = toast.loading(`Generating ${format.toUpperCase()} report...`);
+    
+    try {
+        const response = await fetch(url, {
+            headers: createAuthHeaders(user?.token),
+        });
+        
+        if (!response.ok) throw new Error('Export failed');
+        
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `report-${report.reportId.substring(0, 8)}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
+        
+        toast.success(`${format.toUpperCase()} report exported`, { id: toastId });
+    } catch (error) {
+        toast.error('Failed to export report', { id: toastId });
+    }
+  };
+
   const getCategoryBadgeStyle = (category: string) => {
     const styles: { [key: string]: string } = {
       'GDPR': 'bg-blue-500/10 text-blue-400 border-blue-500/20 border',
@@ -187,9 +224,20 @@ export default function ReportDetailsPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                         Report Details
-                        <span className="text-sm font-normal text-zinc-400 bg-zinc-800 px-3 py-1 rounded-full border border-zinc-700">
-                            #{report.reportId?.substring(0, 8) || 'N/A'}
-                        </span>
+                        <div className="flex items-center gap-2 text-sm font-normal text-zinc-400 bg-zinc-800 px-3 py-1 rounded-full border border-zinc-700">
+                            <span title={report.reportId}>
+                                #{report.reportId?.substring(0, 8) || 'N/A'}...
+                            </span>
+                            <button
+                                onClick={() => copyToClipboard(report.reportId)}
+                                className="hover:text-white transition-colors"
+                                title="Copy Full Report ID"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                            </button>
+                        </div>
                     </h1>
                     <p className="text-zinc-400 mt-1 flex items-center gap-2">
                         <span className="font-medium text-zinc-300">{report.scanPath || 'Project Scan'}</span>
@@ -199,6 +247,27 @@ export default function ReportDetailsPage() {
                 </div>
                 
                 <div className="flex items-center gap-6 text-sm">
+                    <div className="flex gap-2 mr-4">
+                        <button 
+                            onClick={() => handleExport('csv')}
+                            className="p-2 text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition-all"
+                            title="Export CSV"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </button>
+                        <button 
+                            onClick={() => handleExport('pdf')}
+                            className="p-2 text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition-all"
+                            title="Export PDF"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+                    </div>
+
                     <div className="text-center px-4 py-2 bg-zinc-800/50 rounded-lg border border-zinc-800">
                         <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Files Scanned</p>
                         <p className="text-xl font-bold text-white">{report.filesScanned}</p>

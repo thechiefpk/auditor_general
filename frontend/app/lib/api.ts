@@ -10,6 +10,9 @@ export const API_ENDPOINTS = {
   // Scan endpoints
   SCAN_LOCAL: `${API_BASE_URL}/api/scan/local`,
   SCAN_GIT: `${API_BASE_URL}/api/scan/git`,
+  SCAN_GIT_VALIDATE: `${API_BASE_URL}/api/scan/git/validate`,
+  SCAN_SQL: `${API_BASE_URL}/api/scan/sql`,
+  SCAN_SONAR: `${API_BASE_URL}/api/scan/sonar`,
   SCAN_PROGRESS: (jobId: string) => `${API_BASE_URL}/api/scan/progress/${jobId}`,
   SCAN_CANCEL: (jobId: string) => `${API_BASE_URL}/api/scan/${jobId}/cancel`,
   SCAN_ACTIVECOUNT: `${API_BASE_URL}/api/scan/activecount`,
@@ -24,6 +27,16 @@ export const API_ENDPOINTS = {
   // System endpoints
   SYSTEM_DOCKER_STATUS: `${API_BASE_URL}/api/system/docker-status`,
   SYSTEM_START_DOCKER: `${API_BASE_URL}/api/system/start-docker`,
+
+  // Network Audit endpoints
+  NETWORK_SCAN: `${API_BASE_URL}/api/network/scan`,
+  NETWORK_REPORT_PDF: (id: string) => `${API_BASE_URL}/api/network/report/${id}/pdf`,
+
+  // Schedule endpoints
+  SCHEDULE_BASE: `${API_BASE_URL}/api/schedule`,
+
+  // Stats endpoints
+  STATS_DAILY: `${API_BASE_URL}/api/stats/daily`,
 };
 
 // Helper function to create headers with auth token

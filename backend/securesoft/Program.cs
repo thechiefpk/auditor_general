@@ -57,12 +57,21 @@ builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 var conn = builder.Configuration["SQL_SERVER_CONNECTION"];
 builder.Services.AddSingleton<ISqlReportRepository>(new SqlReportRepository(conn));
 builder.Services.AddSingleton<IScanProgressRepository>(new SqlScanProgressRepository(conn));
+builder.Services.AddSingleton<IScheduleRepository>(new SqlScheduleRepository(conn));
 
 // register ComplianceService with repo
 builder.Services.AddScoped<ComplianceService>(sp => new ComplianceService(sp.GetService<ISqlReportRepository>()));
 builder.Services.AddScoped<PrivadoScanner>();
+builder.Services.AddScoped<SqlScanner>();
 builder.Services.AddScoped<ScanJobService>();
 builder.Services.AddScoped<PdfReportService>();
+builder.Services.AddScoped<NetworkAuditService>();
+
+// Register Scheduler Service
+builder.Services.AddHostedService<SchedulerService>();
+
+builder.Services.AddHttpClient<SonarQubeService>();
+builder.Services.AddScoped<SonarQubeService>();
 
 builder.Services.AddHangfire(configuration => configuration
     .UseSimpleAssemblyNameTypeSerializer()

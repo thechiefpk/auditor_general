@@ -93,7 +93,71 @@ namespace ComplianceSecurityAuditor.Controllers
             }
 
             var jobId = Guid.NewGuid().ToString("N");
-            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunLocalScan(jobId, userId, path, request.IsAdvanced));
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunLocalScan(jobId, userId, path, request.IsAdvanced, null));
+            await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
+            return Ok(new { jobId });
+        }
+
+        [HttpPost("scan/sql")]
+        public async Task<IActionResult> EnqueueSqlScan([FromBody] ScanRequest request)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Path))
+                return BadRequest(new { error = "Request body must contain a non-empty 'path' field." });
+            
+            var path = Utility.NormalizePath(request.Path, out var normalizeError);
+            if (normalizeError is not null)
+                return BadRequest(new { error = normalizeError });
+            if (!Directory.Exists(path) && !System.IO.File.Exists(path))
+                return BadRequest(new { error = "Path does not exist.", path });
+
+            Guid userId;
+            try
+            {
+                userId = GetCurrentUserId();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+
+            var jobId = Guid.NewGuid().ToString("N");
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunSqlScan(jobId, userId, path, null));
+            await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
+            return Ok(new { jobId });
+        }
+
+        [HttpPost("scan/sonar")]
+        public async Task<IActionResult> EnqueueSonarScan([FromBody] SonarScanRequest request)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.ProjectPath) || string.IsNullOrWhiteSpace(request.ProjectKey) || string.IsNullOrWhiteSpace(request.Token))
+                return BadRequest(new { error = "Project Path, Key, and Token are required." });
+            
+            var path = Utility.NormalizePath(request.ProjectPath, out var normalizeError);
+            if (normalizeError is not null)
+                return BadRequest(new { error = normalizeError });
+            if (!Directory.Exists(path) && !System.IO.File.Exists(path))
+                return BadRequest(new { error = "Path does not exist.", path });
+
+            Guid userId;
+            try
+            {
+                userId = GetCurrentUserId();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+
+            var jobId = Guid.NewGuid().ToString("N");
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunSonarScan(jobId, userId, path, request.ProjectKey, request.Token, request.HostUrl, null));
             await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
             return Ok(new { jobId });
         }
@@ -299,6 +363,28 @@ namespace ComplianceSecurityAuditor.Controllers
             return needsQuotes ? $"\"{escaped}\"" : escaped;
         }
 
+        [HttpPost("scan/git/validate")]
+        public IActionResult ValidateGitRepo([FromBody] GitScanRequest request)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.RepositoryUrl))
+                return BadRequest(new { error = "Repository URL is required." });
+
+            // Enforce Public Only - Ignore or Warn if Token provided?
+            // We just validate WITHOUT token to ensure it is public.
+            var result = ValidateGitAccess(request.RepositoryUrl, null); // Pass null for token to force public check
+
+            if (result.Success)
+            {
+                return Ok(new { valid = true });
+            }
+            else
+            {
+                // If it failed, it might be private or invalid.
+                // We can't distinguish easily without parsing specific git errors, but for our purpose:
+                return Ok(new { valid = false, error = "Repository is not accessible. Ensure it is public and the URL is correct." });
+            }
+        }
+
         /// <summary>
         /// Scans a Git repository by cloning it temporarily and running compliance checks.
         /// </summary>
@@ -328,11 +414,11 @@ namespace ComplianceSecurityAuditor.Controllers
                 return BadRequest(new { error = ex.Message });
             }
 
-            // Verify Git access/credentials
-            var validationResult = ValidateGitAccess(request.RepositoryUrl, request.AccessToken);
+            // Verify Git access/credentials - FORCE PUBLIC (Pass null token)
+            var validationResult = ValidateGitAccess(request.RepositoryUrl, null);
             if (!validationResult.Success)
             {
-                return BadRequest(new { error = $"Git validation failed: {validationResult.Message}. Please check if the repository is private and provide a valid access token." });
+                return BadRequest(new { error = $"Git validation failed: {validationResult.Message}. Only PUBLIC repositories are supported." });
             }
 
             if (request.IsAdvanced)
@@ -345,7 +431,8 @@ namespace ComplianceSecurityAuditor.Controllers
             }
 
             var jobId = Guid.NewGuid().ToString("N");
-            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunGitScan(jobId, userId, request.RepositoryUrl, request.Branch, request.AccessToken, request.IsAdvanced));
+            // Pass null for accessToken to ScanJobService as well
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunGitScan(jobId, userId, request.RepositoryUrl, request.Branch, null, request.IsAdvanced, null));
             await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
             return Ok(new { jobId });
         }

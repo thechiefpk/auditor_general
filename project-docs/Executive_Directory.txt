@@ -1,0 +1,130 @@
+-----------------------------------------------------------------------------------------------------------
+									* Vanguard *
+-----------------------------------------------------------------------------------------------------------
+
+Development stages
+	-test and fix, optimze all features
+	-justify value delivery scripts
+
+-Final report creation
+1). Read and analyse Check top research papers
+2). Analyse this proj in market dynamics and competitors , create an Evaluation metrics
+	2.1. How is it improving/ values in the existing market?
+3). Architecture diagram of our app.
+4). Workflow diagram of my app.
+
+-----------------------------------------------------------------------------------------------------------
+
+jack_sparrow : admin123
+kingslayer@gmail.com : King@123
+
+
+- Port Scanning Test : scanme.nmap.org
+- What to expect : This is an authorized scanning target. You should see open ports like 80 (HTTP) , 22 (SSH) , and potentially others. It validates that the port knocker is working.
+- Header & SSL Test : example.com
+- What to expect : A basic site that often lacks some modern security headers (like HSTS or CSP) but has valid SSL. Good for checking the "Missing Headers" logic.
+- PII / Data Leakage Test : http://testphp.vulnweb.com/
+- What to expect : Intentionally vulnerable application. It may trigger alerts for leaked data patterns or exposed admin interfaces if they appear in the HTML response.
+- Bad SSL / Expired Cert : expired.badssl.com
+- What to expect : The scanner should flag SSL certificate errors or report a connection failure due to certificate validation (depending on our strictness settings).
+
+1).
+Connection Details
+Status Code
+0 Error: The request was canceled due to the configured HttpClient.Timeout of 30 seconds elapsing.
+Target
+https://scanme.nmap.org
+Open Ports
+No common ports detected (or firewall is blocking).
+PII / Data Leakage
+No PII patterns detected in public response.
+Missing Security Headers
+All critical headers are present.
+Raw Headers
+
+
+2).
+example.com
+Scan Target
+Security Score
+F
+Based on missing headers and server exposure.
+Connection Details
+Status Code
+200 OK
+Target
+https://example.com
+Open Ports
+80
+443
+8080
+PII / Data Leakage
+No PII patterns detected in public response.
+Missing Security Headers
+Strict-Transport-Security
+Content-Security-Policy
+X-Frame-Options
+X-Content-Type-Options
+Referrer-Policy
+Raw Headers
+Date: Sun, 21 Dec 2025 16:10:54 GMT
+Transfer-Encoding: chunked
+Connection: keep-alive
+CF-RAY: 9b18a6fb0b46a7f8-DEL
+Accept-Ranges: bytes
+Age: 9662
+cf-cache-status: HIT
+Server: cloudflare
+Content-Type: text/html
+Last-Modified: Sat, 20 Dec 2025 05:42:21 GMT
+Allow: GET, HEAD
+
+
+3).
+http://testphp.vulnweb.com/
+Scan Target
+Security Score
+F
+Based on missing headers and server exposure.
+Connection Details
+Status Code
+200 OK
+Target
+http://testphp.vulnweb.com/
+Open Ports
+80
+PII / Data Leakage
+Email Address detected (Found 1, e.g., 'wvs@acunetix.com')
+Missing Security Headers
+Strict-Transport-Security
+Content-Security-Policy
+X-Frame-Options
+X-Content-Type-Options
+Referrer-Policy
+Raw Headers
+Server: nginx/1.19.0
+Date: Sun, 21 Dec 2025 16:30:06 GMT
+Transfer-Encoding: chunked
+Connection: keep-alive
+X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1
+Content-Type: text/html; charset=UTF-8
+
+
+4).
+expired.badssl.com
+Scan Target
+Security Score
+Unknown
+Based on missing headers and server exposure.
+Connection Details
+Status Code
+0 Error: No such host is known. (expired.badssl.com:443)
+Target
+https://expired.badssl.com
+Open Ports
+No common ports detected (or firewall is blocking).
+PII / Data Leakage
+No PII patterns detected in public response.
+Missing Security Headers
+All critical headers are present.
+Raw Headers
