@@ -1,16 +1,19 @@
 -----------------------------------------------------------------------------------------------------------
 Compliar proj
 -----------------------------------------------------------------------------------------------------------
--core feature test and build
-	-git scan fixups
-	-revise features as per mid-report
-	-develop network audit discovery
-	-test and fix all features
-
+-Test rigrous core features
+-Prepare value and justification scripts
 -Final report completion
------------------------------------------------------------------------------------------------------------
 
+-----------------------------------------------------------------------------------------------------------
+Database:
+unthinkable: localhost\SQLEXPRESS
+local: DESKTOP-1AG89BB
+
+Backend api url:
 https://localhost:7120/api/auth/login
 
+Users:
 jack_sparrow : admin123
 kingslayer@gmail.com : King@123
+

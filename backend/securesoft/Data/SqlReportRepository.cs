@@ -15,7 +15,34 @@ namespace SecureSoftAPI.Data
 		public SqlReportRepository(string connectionString)
 		{
 			_connectionString = connectionString;
+            EnsureNetworkTableExists();
 		}
+
+        private void EnsureNetworkTableExists()
+        {
+            try 
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                var cmd = new SqlCommand(@"
+                    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='NetworkAudits' AND xtype='U')
+                    CREATE TABLE NetworkAudits (
+                        Id UNIQUEIDENTIFIER PRIMARY KEY,
+                        UserId UNIQUEIDENTIFIER NOT NULL,
+                        Url NVARCHAR(2048) NOT NULL,
+                        StatusCode INT NOT NULL,
+                        StatusReason NVARCHAR(255) NULL,
+                        SecurityScore INT NOT NULL,
+                        CreatedAt DATETIME2 NOT NULL,
+                        JsonResult NVARCHAR(MAX) NOT NULL
+                    )", conn);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating NetworkAudits table: {ex.Message}");
+            }
+        }
 
 		//		public async Task<Guid> SaveReportAsync(string path, ScanSummary summary)
 		//		{
@@ -32,9 +59,9 @@ namespace SecureSoftAPI.Data
 		//				cmd.Parameters.AddWithValue("@FilesScanned", summary.FilesScanned);
 		//				cmd.Parameters.AddWithValue("@ViolationsFound", summary.ViolationsFound);
 		//				cmd.Parameters.AddWithValue("@CreatedAt", DateTime.UtcNow);
-
+		//
 		//				var id = (Guid)await cmd.ExecuteScalarAsync();
-
+		//
 		//				// Insert violations
 		//				foreach (var v in summary.Violations)
 		//				{
@@ -49,7 +76,7 @@ namespace SecureSoftAPI.Data
 		//					vcmd.Parameters.AddWithValue("@Category", v.ViolatedRule.Category);
 		//					await vcmd.ExecuteNonQueryAsync();
 		//				}
-
+		//
 		//				tran.Commit();
 		//				return id;
 		//			}
@@ -471,37 +498,163 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 
 		public async Task<List<Violation>> GetViolationsAllAsync(Guid reportId)
 		{
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var list = new List<Violation>();
+            var vcmd = new SqlCommand("SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description FROM Violations WHERE ReportId = @Id ORDER BY FilePath, LineNumber", conn);
+            vcmd.Parameters.AddWithValue("@Id", reportId);
+            using var vreader = await vcmd.ExecuteReaderAsync();
+            while (await vreader.ReadAsync())
+            {
+                var file = vreader.GetString(0);
+                var line = vreader.GetInt32(1);
+                var matched = vreader.IsDBNull(2) ? string.Empty : vreader.GetString(2);
+                var ruleId = vreader.GetString(3);
+                var ruleName = vreader.GetString(4);
+                var category = vreader.GetString(5);
+                var severityStr = vreader.IsDBNull(6) ? "Medium" : vreader.GetString(6);
+                Enum.TryParse(severityStr, out AuditSeverity severity);
+                var remediation = vreader.IsDBNull(7) ? string.Empty : vreader.GetString(7);
+                var refUrl = vreader.IsDBNull(8) ? null : vreader.GetString(8);
+                var description = vreader.IsDBNull(9) ? string.Empty : vreader.GetString(9);
+
+                var rule = new AuditRule(ruleId, ruleName, category, description, severity, remediation, refUrl, null!);
+                var violation = new Violation(file, line, matched, rule);
+                list.Add(violation);
+            }
+            return list;
+        }
+
+		public async Task<List<DailyStat>> GetDailyStatsAsync(Guid userId)
+		{
 			using var conn = new SqlConnection(_connectionString);
 			await conn.OpenAsync();
 
-			var list = new List<Violation>();
-			var q = @"SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description 
-					  FROM Violations 
-					  WHERE ReportId = @Id 
-					  ORDER BY FilePath, LineNumber";
-			var cmd = new SqlCommand(q, conn);
-			cmd.Parameters.AddWithValue("@Id", reportId);
+			var list = new List<DailyStat>();
+			// Combine Code Scans and Network Scans (for count)
+            // For Violations, we only have them in Reports (Code Scans) mostly.
+            // Network scans have issues but not stored as 'ViolationsFound' integer directly in the same way (it's inside JSON or separate logic).
+            // For now, we'll aggregate Reports for Violations/Cost, and sum counts from both.
+            
+			var cmd = new SqlCommand(@"
+                SELECT 
+                    Date,
+                    SUM(ScanCount) as ScanCount,
+                    SUM(Violations) as ViolationCount
+                FROM (
+                    SELECT CAST(CreatedAt AS DATE) as Date, COUNT(*) as ScanCount, SUM(ViolationsFound) as Violations FROM Reports WHERE UserId = @UserId GROUP BY CAST(CreatedAt AS DATE)
+                    UNION ALL
+                    SELECT CAST(CreatedAt AS DATE) as Date, COUNT(*) as ScanCount, SUM((100 - SecurityScore) / 5) as Violations FROM NetworkAudits WHERE UserId = @UserId GROUP BY CAST(CreatedAt AS DATE)
+                ) as Combined
+                GROUP BY Date
+                ORDER BY Date ASC", conn);
+
+			cmd.Parameters.AddWithValue("@UserId", userId);
 
 			using var reader = await cmd.ExecuteReaderAsync();
 			while (await reader.ReadAsync())
 			{
-				var file = reader.GetString(0);
-				var line = reader.GetInt32(1);
-				var matched = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
-				var ruleId = reader.GetString(3);
-				var ruleName = reader.GetString(4);
-				var category = reader.GetString(5);
-				var severityStr = reader.IsDBNull(6) ? "Medium" : reader.GetString(6);
-				Enum.TryParse(severityStr, out AuditSeverity severity);
-				var remediation = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
-				var refUrl = reader.IsDBNull(8) ? null : reader.GetString(8);
-				var description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9);
+				var date = reader.GetDateTime(0);
+				var count = reader.GetInt32(1);
+                var violations = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
+                
+                Console.WriteLine($"[DailyStats] Date={date:yyyy-MM-dd} Count={count} Violations={violations}");
 
-				var rule = new AuditRule(ruleId, ruleName, category, description, severity, remediation, refUrl, null!);
-				list.Add(new Violation(file, line, matched, rule));
+                // Estimate savings: $150 per violation found (industry average cost to fix in prod vs dev)
+				list.Add(new DailyStat { 
+                    Date = date.ToString("yyyy-MM-dd"), 
+                    ScanCount = count,
+                    ViolationCount = violations,
+                    DollarsSaved = violations * 150 
+                });
 			}
-
 			return list;
 		}
+
+        public async Task<Guid> SaveNetworkAuditAsync(Guid userId, NetworkScanResult result)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+            
+            var id = Guid.NewGuid();
+            result.Id = id;
+            result.CreatedAt = DateTime.UtcNow;
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+
+            var cmd = new SqlCommand(@"
+                INSERT INTO NetworkAudits (Id, UserId, Url, StatusCode, StatusReason, SecurityScore, CreatedAt, JsonResult)
+                VALUES (@Id, @UserId, @Url, @StatusCode, @StatusReason, @SecurityScore, @CreatedAt, @JsonResult)
+            ", conn);
+
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.Parameters.AddWithValue("@UserId", userId);
+            cmd.Parameters.AddWithValue("@Url", result.Url);
+            cmd.Parameters.AddWithValue("@StatusCode", result.StatusCode);
+            cmd.Parameters.AddWithValue("@StatusReason", result.StatusReason ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@SecurityScore", result.SecurityScore);
+            cmd.Parameters.AddWithValue("@CreatedAt", result.CreatedAt);
+            cmd.Parameters.AddWithValue("@JsonResult", json);
+
+            await cmd.ExecuteNonQueryAsync();
+            return id;
+        }
+
+        public async Task<List<NetworkScanResult>> GetNetworkAuditsByUserAsync(Guid userId)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var list = new List<NetworkScanResult>();
+            var cmd = new SqlCommand("SELECT Id, Url, StatusCode, StatusReason, SecurityScore, CreatedAt, JsonResult FROM NetworkAudits WHERE UserId = @UserId ORDER BY CreatedAt DESC", conn);
+            cmd.Parameters.AddWithValue("@UserId", userId);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var json = reader.GetString(6);
+                var result = System.Text.Json.JsonSerializer.Deserialize<NetworkScanResult>(json);
+                if (result != null)
+                {
+                    // Ensure core fields match DB (in case JSON is slightly stale or whatever)
+                    result.Id = reader.GetGuid(0);
+                    result.Url = reader.GetString(1);
+                    result.StatusCode = reader.GetInt32(2);
+                    result.StatusReason = reader.IsDBNull(3) ? null : reader.GetString(3);
+                    result.SecurityScore = reader.GetInt32(4);
+                    result.CreatedAt = reader.GetDateTime(5);
+                    list.Add(result);
+                }
+            }
+            return list;
+        }
+
+        public async Task<NetworkScanResult?> GetNetworkAuditByIdAsync(Guid id)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var cmd = new SqlCommand("SELECT Id, Url, StatusCode, StatusReason, SecurityScore, CreatedAt, JsonResult FROM NetworkAudits WHERE Id = @Id", conn);
+            cmd.Parameters.AddWithValue("@Id", id);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                var json = reader.GetString(6);
+                var result = System.Text.Json.JsonSerializer.Deserialize<NetworkScanResult>(json);
+                if (result != null)
+                {
+                    result.Id = reader.GetGuid(0);
+                    result.Url = reader.GetString(1);
+                    result.StatusCode = reader.GetInt32(2);
+                    result.StatusReason = reader.IsDBNull(3) ? null : reader.GetString(3);
+                    result.SecurityScore = reader.GetInt32(4);
+                    result.CreatedAt = reader.GetDateTime(5);
+                    return result;
+                }
+            }
+            return null;
+        }
 	}
 }

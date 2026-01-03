@@ -89,11 +89,20 @@ namespace ComplianceSecurityAuditor.Library
                 {
                     var buffer = new byte[8000];
                     var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                    
+                    // Check for null bytes or excessive non-printable chars
+                    int nullCount = 0;
+                    int nonPrintableCount = 0;
+                    
                     for (int i = 0; i < bytesRead; i++)
                     {
-                        // Check for null byte, common indicator of binary files
-                        if (buffer[i] == 0) return true;
+                        if (buffer[i] == 0) nullCount++;
+                        else if (buffer[i] < 32 && buffer[i] != 9 && buffer[i] != 10 && buffer[i] != 13) nonPrintableCount++;
                     }
+
+                    // If more than 10% are non-printable or any nulls, treat as binary
+                    if (nullCount > 0) return true;
+                    if (bytesRead > 0 && (double)nonPrintableCount / bytesRead > 0.3) return true;
                 }
             }
             catch { return true; } // Treat unreadable files as binary/skippable

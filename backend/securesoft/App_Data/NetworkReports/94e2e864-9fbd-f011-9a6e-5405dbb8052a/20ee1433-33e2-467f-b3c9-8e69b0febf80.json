@@ -1,0 +1,35 @@
+{
+  "Id": "20ee1433-33e2-467f-b3c9-8e69b0febf80",
+  "CreatedAt": "2025-12-27T15:19:27.8135351Z",
+  "Url": "https://example.com",
+  "StatusCode": 200,
+  "StatusReason": "OK",
+  "Headers": {
+    "Date": "Sat, 27 Dec 2025 15:19:27 GMT",
+    "Transfer-Encoding": "chunked",
+    "Connection": "keep-alive",
+    "CF-RAY": "9b49cbdece9ea7d4-DEL",
+    "Accept-Ranges": "bytes",
+    "Age": "6548",
+    "cf-cache-status": "HIT",
+    "Server": "cloudflare",
+    "Content-Type": "text/html",
+    "Last-Modified": "Sat, 20 Dec 2025 05:43:40 GMT",
+    "Allow": "GET, HEAD"
+  },
+  "SslInfo": null,
+  "MissingSecurityHeaders": [
+    "Strict-Transport-Security",
+    "Content-Security-Policy",
+    "X-Frame-Options",
+    "X-Content-Type-Options",
+    "Referrer-Policy"
+  ],
+  "SecurityScore": 25,
+  "OpenPorts": [
+    80,
+    443,
+    8080
+  ],
+  "PiiFindings": []
+}

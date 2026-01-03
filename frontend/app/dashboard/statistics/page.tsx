@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { API_ENDPOINTS, createAuthHeaders } from '@/app/lib/api';
 import toast from 'react-hot-toast';
@@ -26,12 +27,25 @@ interface Statistics {
 
 export default function StatisticsPage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [scanId, setScanId] = useState('');
   const [stats, setStats] = useState<Statistics | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchStatistics = async () => {
-    if (!scanId.trim()) {
+  useEffect(() => {
+    const idParam = searchParams.get('id');
+    if (idParam) {
+      setScanId(idParam);
+      if (user?.token) {
+        fetchStatistics(idParam);
+      }
+    }
+  }, [searchParams, user?.token]);
+
+  const fetchStatistics = async (idOverride?: string) => {
+    const idToUse = idOverride || scanId;
+
+    if (!idToUse.trim()) {
       toast.error('Please enter a scan ID');
       return;
     }
@@ -39,7 +53,7 @@ export default function StatisticsPage() {
     setLoading(true);
     try {
       const response = await fetch(
-        API_ENDPOINTS.STATS(scanId),
+        API_ENDPOINTS.STATS(idToUse),
         {
           headers: createAuthHeaders(user?.token),
         }

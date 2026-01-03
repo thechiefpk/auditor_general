@@ -8,9 +8,9 @@ namespace ComplianceSecurityAuditor.Services
     {
         private readonly FileScanner _fileScanner;
         private readonly ValidationEngine _validationEngine;
-        private readonly ISqlReportRepository _repo;
+        private readonly ISqlReportRepository? _repo;
 
-        public ComplianceService(ISqlReportRepository repo = null)
+        public ComplianceService(ISqlReportRepository? repo = null)
         {
             _fileScanner = new FileScanner();
             var rules = RuleRegistry.GetRules();
@@ -137,6 +137,12 @@ namespace ComplianceSecurityAuditor.Services
             return await _repo.GetTopFilesAsync(reportId, limit);
         }
 
+        public async Task<NetworkScanResult?> GetNetworkAuditByIdAsync(Guid id)
+        {
+            if (_repo == null) return null;
+            return await _repo.GetNetworkAuditByIdAsync(id);
+        }
+
         public async Task<List<ScanSummary>> GetReportsByUserAsync(Guid userId)
         {
             if (_repo == null) throw new InvalidOperationException("Repository not configured.");
@@ -153,6 +159,12 @@ namespace ComplianceSecurityAuditor.Services
         {
             if (_repo == null) throw new InvalidOperationException("Repository not configured.");
             return await _repo.GetViolationsAllAsync(reportId);
+        }
+
+        public async Task<List<NetworkScanResult>> GetNetworkAuditsByUserAsync(Guid userId)
+        {
+            if (_repo == null) throw new InvalidOperationException("Repository not configured.");
+            return await _repo.GetNetworkAuditsByUserAsync(userId);
         }
     }
 }

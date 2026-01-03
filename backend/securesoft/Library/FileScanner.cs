@@ -18,21 +18,45 @@ namespace ComplianceSecurityAuditor.Library
 		// Directories to strictly ignore
 		private static readonly HashSet<string> DirsToIgnore = new(StringComparer.OrdinalIgnoreCase)
 		{ 
-			".git", ".vs", ".idea", ".vscode",
-			"node_modules", "bower_components", "jspm_packages",
-			"bin", "obj", "debug", "release", "debugger",
-			"dist", "build", "out", "target",
-			"coverage", "test-results", "test", "tests", "spec", "specs", "tmp", "temp",
-			"vendor", "plugins", "storage",
-			"assets", "static", "images", "img", "fonts", "css", "scss", "less", "sass",
-			"lib", "libs" // Often 3rd party
+			// Version Control
+			".git", ".svn", ".hg", ".bzr", ".cvs",
+			
+			// IDEs & Editors
+			".vs", ".idea", ".vscode", ".settings", ".project", ".classpath", ".metadata",
+
+			// Dependencies
+			"node_modules", "bower_components", "jspm_packages", "packages", "vendor", "3rdparty", "third_party",
+			"venv", ".venv", "env", ".env", "__pycache__", ".pytest_cache", ".mypy_cache", ".tox", ".eggs",
+
+			// Build Artifacts (General)
+			"bin", "obj", "debug", "release", "x64", "x86", "build", "dist", "out", "target", "output",
+			
+			// Web Frameworks (Next.js, Nuxt, etc.)
+			".next", ".nuxt", ".output", ".vercel", ".netlify", ".cache", ".parcel-cache",
+			"public", "static", "assets", // Often just static assets, though sometimes contain JS
+
+			// Testing & Logs
+			"coverage", "test-results", "test", "tests", "spec", "specs", "tmp", "temp", "logs", "log",
+
+			// Java/Kotlin
+			".gradle", "gradle",
+			
+			// Mobile
+			".dart_tool", "Pods", "DerivedData"
 		};
 
 		// Specific file names to ignore
 		private static readonly HashSet<string> FilesToIgnore = new(StringComparer.OrdinalIgnoreCase)
 		{
-			"package-lock.json", "yarn.lock", "composer.lock", "Gemfile.lock",
-			"jquery.js", "jquery.min.js", "angular.js", "react.js", "vue.js" // Common libs
+			// Lock files
+			"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "composer.lock", "Gemfile.lock", "Podfile.lock", "Cargo.lock", "mix.lock",
+			
+			// Configs that might look like code or contain noise
+			"tsconfig.json", "jsconfig.json", "angular.json", "firebase.json", "vercel.json",
+			
+			// Minified/Bundled Libs (specifics)
+			"jquery.js", "jquery.min.js", "angular.js", "angular.min.js", "react.js", "react.min.js", "vue.js", "vue.min.js",
+			"bootstrap.js", "bootstrap.min.js", "bundle.js", "main.js", "vendor.js", "common.js"
 		};
 
 		/// <summary>
@@ -102,13 +126,22 @@ namespace ComplianceSecurityAuditor.Library
 			// Check strict file name ignores
 			if (FilesToIgnore.Contains(fileName)) return false;
 
-			// Check for minified files
+			// Check for minified files or map files
 			if (fileName.EndsWith(".min.js", StringComparison.OrdinalIgnoreCase) || 
-				fileName.EndsWith(".min.css", StringComparison.OrdinalIgnoreCase)) 
+				fileName.EndsWith(".min.css", StringComparison.OrdinalIgnoreCase) ||
+				fileName.EndsWith(".map", StringComparison.OrdinalIgnoreCase) ||
+				fileName.EndsWith(".d.ts", StringComparison.OrdinalIgnoreCase) || // Typescript definition files
+				fileName.Contains(".bundle.", StringComparison.OrdinalIgnoreCase) ||
+				fileName.Contains(".chunk.", StringComparison.OrdinalIgnoreCase) ||
+				fileName.Contains("node_modules", StringComparison.OrdinalIgnoreCase)) // Files like node_modules_c564ad58._.js
 				return false;
 
 			// Special handling for JS files (allow .js but not .min.js, which is handled above)
 			if (string.Equals(extension, ".js", StringComparison.OrdinalIgnoreCase)) return true;
+
+			// Special handling for appsettings.json and variants (e.g. appsettings.Development.json)
+			if (fileName.StartsWith("appsettings", StringComparison.OrdinalIgnoreCase) && 
+				string.Equals(extension, ".json", StringComparison.OrdinalIgnoreCase)) return true;
 
 			// Check whitelist
 			return AllowedExtensions.Contains(extension);

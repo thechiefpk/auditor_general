@@ -43,6 +43,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(false);
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    
+    const interval = setInterval(() => {
+      const currentToken = Cookies.get('authToken');
+      if (!currentToken) {
+        // Token expired or removed - force logout
+        Cookies.remove('authToken');
+        Cookies.remove('authUsername');
+        setUser(null);
+        router.push('/login');
+        toast.error('Session expired. Please login again.');
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [user, router]);
+
   // 5. Login Function
   const login = async (username: string, password: string) => {
     console.log('AuthContext.login called with:', username);
@@ -54,20 +72,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
       if (!error && data) {
         const token = (data as any).token;
-        Cookies.set('authToken', token, { expires: 1 });
-        Cookies.set('authUsername', username, { expires: 1 });
+        // Set cookie to expire in 2 hours (0.083 days = 2 hours) to match backend
+        Cookies.set('authToken', token, { expires: 0.083 });
+        Cookies.set('authUsername', username, { expires: 0.083 });
         setUser({ token, username });
         toast.success('Login successful!');
         router.push('/dashboard');
         return { ok: true };
       } else {
         const msg = error || 'Login failed';
-        // toast.error(msg); // Removed to avoid double toast in UI components
         return { ok: false, message: msg };
       }
     } catch (error) {
       const msg = 'An error occurred during login';
-      // toast.error(msg); // Removed to avoid double toast in UI components
       return { ok: false, message: msg };
     }
   };
@@ -82,20 +99,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
       if (!error && data) {
         const token = (data as any).token;
-        Cookies.set('authToken', token, { expires: 1 });
-        Cookies.set('authUsername', username, { expires: 1 });
+        // Set cookie to expire in 2 hours
+        Cookies.set('authToken', token, { expires: 0.083 });
+        Cookies.set('authUsername', username, { expires: 0.083 });
         setUser({ token, username });
         toast.success('Account created successfully!');
         router.push('/dashboard');
         return { ok: true };
       } else {
         const msg = error || 'Signup failed';
-        // toast.error(msg); // Removed to avoid double toast in UI components
         return { ok: false, message: msg };
       }
     } catch (error) {
       const msg = 'An error occurred during signup';
-      // toast.error(msg); // Removed to avoid double toast in UI components
       return { ok: false, message: msg };
     }
   };

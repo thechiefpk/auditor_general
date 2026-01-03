@@ -192,6 +192,47 @@ public static partial class RuleRegistry
                 "Remove credentials from comments.",
                 null,
                 new Regex(@"//\s*(password|secret|key|token)\s*[:=]\s*['""]?[\w.-]{8,}['""]?", options)),
+
+            new("CODE-007", "Dangerous Function Use (eval)", "Security", "Finds usage of 'eval()' which is a security risk.",
+                AuditSeverity.High,
+                "Avoid using eval(). It allows execution of arbitrary code.",
+                "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval",
+                new Regex(@"\beval\s*\(", options),
+                new HashSet<string>{".js", ".ts", ".jsx", ".tsx", ".py", ".php"}),
+            
+            new("CODE-008", "Hardcoded IP Address", "Security", "Finds hardcoded IPv4 addresses.",
+                AuditSeverity.Low,
+                "Avoid hardcoding IPs. Use DNS or config.",
+                null,
+                new Regex(@"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", options)),
+
+            new("REACT-001", "DangerouslySetInnerHTML", "Security", "Finds usage of dangerouslySetInnerHTML in React.",
+                AuditSeverity.High,
+                "Ensure content is sanitized before using dangerouslySetInnerHTML to prevent XSS.",
+                "https://reactjs.org/docs/dom-elements.html#dangerouslysetinnerhtml",
+                new Regex(@"dangerouslySetInnerHTML", options),
+                new HashSet<string>{".jsx", ".tsx", ".js", ".ts"}),
+            
+            #endregion
+
+            #region Cloud & Infrastructure Secrets
+            new("CLOUD-001", "Azure Storage Account Key", "Security", "Finds Azure Storage Account Keys.",
+                AuditSeverity.Critical,
+                "Rotate key immediately. Use Managed Identities.",
+                "https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage",
+                new Regex(@"\b[a-zA-Z0-9+/]{86}==\b", options)),
+
+            new("CLOUD-002", "Heroku API Key", "Security", "Finds Heroku API keys.",
+                AuditSeverity.Critical,
+                "Revoke key immediately.",
+                null,
+                new Regex(@"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", options)),
+            
+            new("CLOUD-003", "Generic API Key", "Security", "Finds generic high-entropy strings that look like API keys.",
+                AuditSeverity.High,
+                "Investigate if this is a real secret. Store secrets securely.",
+                null,
+                new Regex(@"(?i)(api_key|apikey|secret|token)[\s=:'""]+([a-zA-Z0-9]{32,45})\b", options)),
             #endregion	
                 
             #region SQL and Database Schema Validation

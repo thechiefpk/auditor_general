@@ -10,17 +10,71 @@ namespace ComplianceSecurityAuditor.Services
         private readonly ComplianceService _compliance;
         private readonly ISqlReportRepository _repo;
         private readonly IScanProgressRepository _progress;
+        private readonly IScheduleRepository _scheduleRepo;
         private readonly PrivadoScanner _privado;
+        private readonly SqlScanner _sqlScanner;
+        private readonly NetworkAuditService _networkAuditService;
 
-        public ScanJobService(ComplianceService compliance, ISqlReportRepository repo, IScanProgressRepository progress, PrivadoScanner privado)
+        public ScanJobService(ComplianceService compliance, ISqlReportRepository repo, IScanProgressRepository progress, IScheduleRepository scheduleRepo, PrivadoScanner privado, SqlScanner sqlScanner, NetworkAuditService networkAuditService)
         {
             _compliance = compliance;
             _repo = repo;
             _progress = progress;
+            _scheduleRepo = scheduleRepo;
             _privado = privado;
+            _sqlScanner = sqlScanner;
+            _networkAuditService = networkAuditService;
         }
 
-        public async Task RunLocalScan(string jobId, Guid userId, string path, bool isAdvanced = false)
+        public async Task RunNetworkScan(string jobId, Guid userId, string target, Guid? scheduleId = null)
+        {
+            try
+            {
+                await _progress.UpdateAsync(jobId, "Scanning", $"Running Network Scan on {target}...", 0, 0, 0, 0);
+
+                var result = await _networkAuditService.ScanWebsiteAsync(target);
+
+                // Save to NetworkAudits table
+                await _networkAuditService.SaveScanResultAsync(userId, result);
+                var reportId = result.Id;
+
+                await _progress.CompleteAsync(jobId, reportId);
+
+                if (scheduleId.HasValue)
+                {
+                    await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                    {
+                        Id = Guid.NewGuid(),
+                        ScheduleId = scheduleId.Value,
+                        ExecutedAt = DateTime.UtcNow,
+                        Status = "Success",
+                        ResultSummary = reportId.ToString()
+                    });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                }
+            }
+            catch (Exception ex)
+            {
+                await _progress.FailAsync(jobId, ex.Message);
+                if (scheduleId.HasValue)
+                {
+                    await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                    {
+                        Id = Guid.NewGuid(),
+                        ScheduleId = scheduleId.Value,
+                        ExecutedAt = DateTime.UtcNow,
+                        Status = "Failed",
+                        ErrorMessage = ex.Message
+                    });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                }
+            }
+        }
+
+
+
+
+        public async Task RunLocalScan(string jobId, Guid userId, string path, bool isAdvanced = false, Guid? scheduleId = null)
         {
             try
             {
@@ -28,7 +82,7 @@ namespace ComplianceSecurityAuditor.Services
 
                 if (isAdvanced)
                 {
-                    await _progress.UpdateAsync(jobId, "Deep Scan", "Running Advanced Analysis (Privado)...", 0, 0, 0, 0);
+                    await _progress.UpdateAsync(jobId, "Deep Scan", "Running Advanced Analysis (3rd Party)...", 0, 0, 0, 0);
                     var privadoViolations = await _privado.RunScanAsync(path, jobId);
                     summary.Violations.AddRange(privadoViolations);
                     summary.ViolationsFound += privadoViolations.Count;
@@ -43,15 +97,39 @@ namespace ComplianceSecurityAuditor.Services
                 else
                 {
                     await _progress.CompleteAsync(jobId, reportId);
+                    if (scheduleId.HasValue)
+                    {
+                        await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                        {
+                            Id = Guid.NewGuid(),
+                            ScheduleId = scheduleId.Value,
+                            ExecutedAt = DateTime.UtcNow,
+                            Status = "Success",
+                            ResultSummary = reportId.ToString()
+                        });
+                        await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 await _progress.FailAsync(jobId, ex.Message);
+                if (scheduleId.HasValue)
+                {
+                    await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                    {
+                        Id = Guid.NewGuid(),
+                        ScheduleId = scheduleId.Value,
+                        ExecutedAt = DateTime.UtcNow,
+                        Status = "Failed",
+                        ErrorMessage = ex.Message
+                    });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                }
             }
         }
 
-        public async Task RunGitScan(string jobId, Guid userId, string repoUrl, string? branch, string? accessToken, bool isAdvanced = false)
+        public async Task RunGitScan(string jobId, Guid userId, string repoUrl, string? branch, string? accessToken, bool isAdvanced = false, Guid? scheduleId = null)
         {
             string? tempDirectory = null;
             try
@@ -69,6 +147,18 @@ namespace ComplianceSecurityAuditor.Services
                          return;
                     }
                     await _progress.FailAsync(jobId, "Clone failed");
+                    if (scheduleId.HasValue)
+                    {
+                        await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                        {
+                            Id = Guid.NewGuid(),
+                            ScheduleId = scheduleId.Value,
+                            ExecutedAt = DateTime.UtcNow,
+                            Status = "Failed",
+                            ErrorMessage = "Clone failed"
+                        });
+                        await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                    }
                     return;
                 }
 
@@ -92,7 +182,7 @@ namespace ComplianceSecurityAuditor.Services
 
                 if (isAdvanced)
                 {
-                    await _progress.UpdateAsync(jobId, "Deep Scan", "Running Advanced Analysis (Privado)...", 0, 0, 0, 0);
+                    await _progress.UpdateAsync(jobId, "Deep Scan", "Running Advanced Analysis (3rd Party)...", 0, 0, 0, 0);
                     var privadoViolations = await _privado.RunScanAsync(tempDirectory, jobId);
                     summary.Violations.AddRange(privadoViolations);
                     summary.ViolationsFound += privadoViolations.Count;
@@ -107,74 +197,142 @@ namespace ComplianceSecurityAuditor.Services
                 else
                 {
                     await _progress.CompleteAsync(jobId, reportId);
+                    if (scheduleId.HasValue)
+                    {
+                        await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                        {
+                            Id = Guid.NewGuid(),
+                            ScheduleId = scheduleId.Value,
+                            ExecutedAt = DateTime.UtcNow,
+                            Status = "Success",
+                            ResultSummary = reportId.ToString()
+                        });
+                        await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 await _progress.FailAsync(jobId, ex.Message);
+                if (scheduleId.HasValue)
+                {
+                    await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                    {
+                        Id = Guid.NewGuid(),
+                        ScheduleId = scheduleId.Value,
+                        ExecutedAt = DateTime.UtcNow,
+                        Status = "Failed",
+                        ErrorMessage = ex.Message
+                    });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                }
             }
             finally
             {
                 if (tempDirectory != null && Directory.Exists(tempDirectory))
                 {
-                    try { Directory.Delete(tempDirectory, true); } catch { }
+                    try { Directory.Delete(tempDirectory, true); } catch { /* ignore */ }
                 }
             }
         }
 
-        private async Task<bool> CloneRepositoryAsync(string repoUrl, string targetPath, string jobId, string? branch = null, string? accessToken = null)
+        public async Task RunSqlScan(string jobId, Guid userId, string path, Guid? scheduleId = null)
         {
             try
             {
-                var cloneUrl = repoUrl;
-                if (!string.IsNullOrWhiteSpace(accessToken) && repoUrl.StartsWith("https://"))
-                {
-                    var uri = new Uri(repoUrl);
-                    cloneUrl = $"https://{accessToken}@{uri.Host}{uri.PathAndQuery}";
-                }
-                var arguments = $"clone --depth 1 --single-branch";
-                if (!string.IsNullOrWhiteSpace(branch))
-                    arguments += $" --branch {branch}";
-                arguments += $" \"{cloneUrl}\" \"{targetPath}\"";
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "git",
-                    Arguments = arguments,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                await _progress.UpdateAsync(jobId, "Scanning", "Analyzing SQL Files...", 0, 0, 0, 0);
                 
-                // Disable interactive prompts
-                psi.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
-                psi.EnvironmentVariables["GCM_INTERACTIVE"] = "never";
-                // Override credential helper to ensure only provided token is used
-                arguments = $"-c credential.helper= {arguments}";
-                psi.Arguments = arguments;
-
-                using var process = new Process { StartInfo = psi };
-                process.Start();
-
-                // Poll for exit or cancellation
-                var stopwatch = Stopwatch.StartNew();
-                while (!process.HasExited)
+                var violations = await _sqlScanner.ScanPathAsync(path);
+                
+                var summary = new ScanSummary
                 {
-                    if (stopwatch.ElapsedMilliseconds > 120000) // 2 minutes timeout (reduced from 5)
-                    {
-                        process.Kill();
-                        return false;
-                    }
+                    ReportId = Guid.NewGuid(),
+                    ScanPath = path,
+                    FilesScanned = 1, // Simplified for now
+                    ViolationsFound = violations.Count,
+                    Violations = violations,
+                    ScanDate = DateTime.UtcNow
+                };
 
-                    if (await _progress.IsCancelRequestedAsync(jobId))
-                    {
-                        try { process.Kill(); } catch { }
-                        return false;
-                    }
+                var reportId = await _repo.SaveReportAsync(userId, path, summary);
+                await _progress.CompleteAsync(jobId, reportId);
 
-                    await Task.Delay(500);
+                if (scheduleId.HasValue)
+                {
+                    await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                    {
+                        Id = Guid.NewGuid(),
+                        ScheduleId = scheduleId.Value,
+                        ExecutedAt = DateTime.UtcNow,
+                        Status = "Success",
+                        ResultSummary = reportId.ToString()
+                    });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                 }
+            }
+            catch (Exception ex)
+            {
+                await _progress.FailAsync(jobId, ex.Message);
+                if (scheduleId.HasValue)
+                {
+                    await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                    {
+                        Id = Guid.NewGuid(),
+                        ScheduleId = scheduleId.Value,
+                        ExecutedAt = DateTime.UtcNow,
+                        Status = "Failed",
+                        ErrorMessage = ex.Message
+                    });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                }
+            }
+        }
 
+        private async Task<bool> CloneRepositoryAsync(string repoUrl, string targetDir, string jobId, string? branch, string? accessToken)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = targetDir
+            };
+
+            // Basic auth insertion if token provided
+            var cloneUrl = repoUrl;
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                // Inject token into URL: https://TOKEN@github.com/user/repo.git
+                if (repoUrl.StartsWith("https://"))
+                {
+                    cloneUrl = repoUrl.Insert(8, $"{accessToken}@");
+                }
+            }
+
+            var args = $"clone {cloneUrl} .";
+            if (!string.IsNullOrEmpty(branch))
+            {
+                args += $" -b {branch}";
+            }
+
+            startInfo.Arguments = args;
+
+            try
+            {
+                using var process = Process.Start(startInfo);
+                if (process == null) return false;
+
+                // Capture output to detect hangs or prompts
+                // We'll wait with a timeout
+                var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)); // 5 min timeout for clone
+                
+                // We can't easily access the process ID for the job table here without async complexity, 
+                // but the Controller handles the main 'job' process ID. 
+                // This is a child process.
+
+                await process.WaitForExitAsync(cts.Token);
                 return process.ExitCode == 0;
             }
             catch
