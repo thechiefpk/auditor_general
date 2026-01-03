@@ -81,6 +81,21 @@ namespace ComplianceSecurityAuditor.Data
             await conn.ExecuteAsync("DELETE FROM ScanSchedules WHERE Id = @Id", new { Id = id });
         }
 
+        public async Task UpdateAsync(ScanSchedule schedule)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            var sql = @"
+                UPDATE ScanSchedules 
+                SET Frequency = @Frequency, 
+                    StartDate = @StartDate, 
+                    EndDate = @EndDate, 
+                    ScanType = @ScanType, 
+                    ConfigJson = @ConfigJson, 
+                    IsActive = @IsActive
+                WHERE Id = @Id";
+            await conn.ExecuteAsync(sql, schedule);
+        }
+
         public async Task<IEnumerable<ScanSchedule>> GetDueSchedulesAsync()
         {
             using var conn = new SqlConnection(_connectionString);
@@ -100,6 +115,12 @@ namespace ComplianceSecurityAuditor.Data
             await conn.ExecuteAsync("UPDATE ScanSchedules SET LastRun = @LastRun, NextRun = @NextRun WHERE Id = @Id", new { Id = id, LastRun = lastRun, NextRun = nextRun });
         }
 
+        public async Task UpdateLastRunAsync(Guid id, DateTime lastRun)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.ExecuteAsync("UPDATE ScanSchedules SET LastRun = @LastRun WHERE Id = @Id", new { Id = id, LastRun = lastRun });
+        }
+
         public async Task AddExecutionHistoryAsync(ScanExecutionHistory history)
         {
             using var conn = new SqlConnection(_connectionString);
@@ -109,7 +130,7 @@ namespace ComplianceSecurityAuditor.Data
             await conn.ExecuteAsync(sql, history);
         }
 
-        public async Task<IEnumerable<ScanExecutionHistory>> GetHistoryByScheduleIdAsync(Guid scheduleId)
+        public async Task<IEnumerable<ScanExecutionHistory>> GetHistoryAsync(Guid scheduleId)
         {
             using var conn = new SqlConnection(_connectionString);
             return await conn.QueryAsync<ScanExecutionHistory>("SELECT * FROM ScanExecutionHistory WHERE ScheduleId = @ScheduleId ORDER BY ExecutedAt DESC", new { ScheduleId = scheduleId });

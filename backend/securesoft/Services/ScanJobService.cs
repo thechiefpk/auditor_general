@@ -13,10 +13,9 @@ namespace ComplianceSecurityAuditor.Services
         private readonly IScheduleRepository _scheduleRepo;
         private readonly PrivadoScanner _privado;
         private readonly SqlScanner _sqlScanner;
-        private readonly SonarQubeService _sonarService;
         private readonly NetworkAuditService _networkAuditService;
 
-        public ScanJobService(ComplianceService compliance, ISqlReportRepository repo, IScanProgressRepository progress, IScheduleRepository scheduleRepo, PrivadoScanner privado, SqlScanner sqlScanner, SonarQubeService sonarService, NetworkAuditService networkAuditService)
+        public ScanJobService(ComplianceService compliance, ISqlReportRepository repo, IScanProgressRepository progress, IScheduleRepository scheduleRepo, PrivadoScanner privado, SqlScanner sqlScanner, NetworkAuditService networkAuditService)
         {
             _compliance = compliance;
             _repo = repo;
@@ -24,7 +23,6 @@ namespace ComplianceSecurityAuditor.Services
             _scheduleRepo = scheduleRepo;
             _privado = privado;
             _sqlScanner = sqlScanner;
-            _sonarService = sonarService;
             _networkAuditService = networkAuditService;
         }
 
@@ -36,45 +34,10 @@ namespace ComplianceSecurityAuditor.Services
 
                 var result = await _networkAuditService.ScanWebsiteAsync(target);
 
-                // Map NetworkScanResult to ScanSummary
-                var violations = new List<Violation>();
-                
-                foreach (var missing in result.MissingSecurityHeaders)
-                {
-                    violations.Add(new Violation
-                    {
-                        FilePath = target,
-                        LineNumber = 0,
-                        MatchedText = missing,
-                        ViolatedRule = new Audit.AuditRule("NET001", "Missing Security Header", "Network Security", "Missing recommended security header", Audit.AuditSeverity.Medium, "Add the header to server config", null, null)
-                    });
-                }
+                // Save to NetworkAudits table
+                await _networkAuditService.SaveScanResultAsync(userId, result);
+                var reportId = result.Id;
 
-                foreach (var pii in result.PiiFindings)
-                {
-                     violations.Add(new Violation
-                    {
-                        FilePath = target,
-                        LineNumber = 0,
-                        MatchedText = pii,
-                        ViolatedRule = new Audit.AuditRule("NET002", "PII Exposed", "Privacy", "PII found in response content", Audit.AuditSeverity.High, "Remove PII from response", null, null)
-                    });
-                }
-                
-                // Also add open ports as info or violations if critical? 
-                // For now, let's keep it simple.
-
-                var summary = new ScanSummary
-                {
-                    ReportId = Guid.NewGuid(),
-                    ScanPath = target,
-                    FilesScanned = 1,
-                    ViolationsFound = violations.Count,
-                    Violations = violations,
-                    ScanDate = DateTime.UtcNow
-                };
-
-                var reportId = await _repo.SaveReportAsync(userId, target, summary);
                 await _progress.CompleteAsync(jobId, reportId);
 
                 if (scheduleId.HasValue)
@@ -87,6 +50,7 @@ namespace ComplianceSecurityAuditor.Services
                         Status = "Success",
                         ResultSummary = reportId.ToString()
                     });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                 }
             }
             catch (Exception ex)
@@ -102,67 +66,13 @@ namespace ComplianceSecurityAuditor.Services
                         Status = "Failed",
                         ErrorMessage = ex.Message
                     });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                 }
             }
         }
 
 
-        public async Task RunSonarScan(string jobId, Guid userId, string projectPath, string projectKey, string token, string hostUrl, Guid? scheduleId = null)
-        {
-            try
-            {
-                await _progress.UpdateAsync(jobId, "Preparing", "Initializing SonarQube Scan...", 0, 0, 0, 0);
-                
-                var success = await _sonarService.RunAnalysisAsync(projectPath, projectKey, token, hostUrl, jobId, _progress);
-                
-                if (success)
-                {
-                    await _progress.UpdateAsync(jobId, "Fetching Results", "Retrieving Issues from SonarQube...", 0, 0, 0, 0);
-                    var issuesJson = await _sonarService.GetIssuesAsync(projectKey, hostUrl, token);
-                    
-                    var summary = new ScanSummary
-                    {
-                        ReportId = Guid.NewGuid(),
-                        ScanPath = projectPath,
-                        FilesScanned = 1, 
-                        ViolationsFound = 0, // We would need to parse issuesJson to get count
-                        Violations = new List<Violation>(), // We would need to parse issuesJson
-                        ScanDate = DateTime.UtcNow
-                    };
 
-                    var reportId = await _repo.SaveReportAsync(userId, projectPath, summary);
-                    
-                    await _progress.CompleteAsync(jobId, reportId);
-
-                    if (scheduleId.HasValue)
-                    {
-                        await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
-                        {
-                            Id = Guid.NewGuid(),
-                            ScheduleId = scheduleId.Value,
-                            ExecutedAt = DateTime.UtcNow,
-                            Status = "Success",
-                            ResultSummary = reportId.ToString()
-                        });
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                await _progress.FailAsync(jobId, ex.Message);
-                if (scheduleId.HasValue)
-                {
-                    await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
-                    {
-                        Id = Guid.NewGuid(),
-                        ScheduleId = scheduleId.Value,
-                        ExecutedAt = DateTime.UtcNow,
-                        Status = "Failed",
-                        ErrorMessage = ex.Message
-                    });
-                }
-            }
-        }
 
         public async Task RunLocalScan(string jobId, Guid userId, string path, bool isAdvanced = false, Guid? scheduleId = null)
         {
@@ -197,6 +107,7 @@ namespace ComplianceSecurityAuditor.Services
                             Status = "Success",
                             ResultSummary = reportId.ToString()
                         });
+                        await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                     }
                 }
             }
@@ -213,6 +124,7 @@ namespace ComplianceSecurityAuditor.Services
                         Status = "Failed",
                         ErrorMessage = ex.Message
                     });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                 }
             }
         }
@@ -245,6 +157,7 @@ namespace ComplianceSecurityAuditor.Services
                             Status = "Failed",
                             ErrorMessage = "Clone failed"
                         });
+                        await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                     }
                     return;
                 }
@@ -294,6 +207,7 @@ namespace ComplianceSecurityAuditor.Services
                             Status = "Success",
                             ResultSummary = reportId.ToString()
                         });
+                        await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                     }
                 }
             }
@@ -310,6 +224,7 @@ namespace ComplianceSecurityAuditor.Services
                         Status = "Failed",
                         ErrorMessage = ex.Message
                     });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                 }
             }
             finally
@@ -352,6 +267,7 @@ namespace ComplianceSecurityAuditor.Services
                         Status = "Success",
                         ResultSummary = reportId.ToString()
                     });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                 }
             }
             catch (Exception ex)
@@ -367,6 +283,7 @@ namespace ComplianceSecurityAuditor.Services
                         Status = "Failed",
                         ErrorMessage = ex.Message
                     });
+                    await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
                 }
             }
         }

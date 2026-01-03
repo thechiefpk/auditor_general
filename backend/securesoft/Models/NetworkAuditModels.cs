@@ -1,4 +1,4 @@
-namespace SecureSoftAPI.Models
+namespace ComplianceSecurityAuditor.Models
 {
     public class NetworkScanRequest
     {

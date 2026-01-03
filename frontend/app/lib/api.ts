@@ -9,6 +9,7 @@ export const API_ENDPOINTS = {
   
   // Scan endpoints
   SCAN_LOCAL: `${API_BASE_URL}/api/scan/local`,
+  SCAN_UPLOAD: `${API_BASE_URL}/api/scan/upload`,
   SCAN_GIT: `${API_BASE_URL}/api/scan/git`,
   SCAN_GIT_VALIDATE: `${API_BASE_URL}/api/scan/git/validate`,
   SCAN_SQL: `${API_BASE_URL}/api/scan/sql`,
@@ -27,13 +28,16 @@ export const API_ENDPOINTS = {
   // System endpoints
   SYSTEM_DOCKER_STATUS: `${API_BASE_URL}/api/system/docker-status`,
   SYSTEM_START_DOCKER: `${API_BASE_URL}/api/system/start-docker`,
+  SYSTEM_BROWSE: `${API_BASE_URL}/api/system/browse`,
 
   // Network Audit endpoints
   NETWORK_SCAN: `${API_BASE_URL}/api/network/scan`,
   NETWORK_REPORT_PDF: (id: string) => `${API_BASE_URL}/api/network/report/${id}/pdf`,
+  REPORT_NETWORK: (id: string) => `${API_BASE_URL}/api/network-report/${id}`,
+  REPORT_NETWORK_CSV: (id: string) => `${API_BASE_URL}/api/network-report/${id}/export/csv`,
 
   // Schedule endpoints
-  SCHEDULE_BASE: `${API_BASE_URL}/api/schedule`,
+  SCHEDULE_BASE: `${API_BASE_URL}/api/schedules`,
 
   // Stats endpoints
   STATS_DAILY: `${API_BASE_URL}/api/stats/daily`,

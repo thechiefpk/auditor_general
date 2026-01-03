@@ -4,8 +4,6 @@ using QuestPDF.Infrastructure;
 using SkiaSharp;
 using ComplianceSecurityAuditor.Models;
 
-using SecureSoftAPI.Models; // Add this namespace
-
 namespace ComplianceSecurityAuditor.Services
 {
     public class PdfReportService

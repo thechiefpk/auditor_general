@@ -1,18 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Label } from 'recharts';
 import { API_ENDPOINTS, createAuthHeaders } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 
-interface DailyStat {
+export interface DailyStat {
     date: string;
     scanCount: number;
     violationCount: number;
     dollarsSaved: number;
 }
 
-export default function DashboardChart() {
+interface DashboardChartProps {
+    onDataPointClick?: (data: DailyStat) => void;
+}
+
+export default function DashboardChart({ onDataPointClick }: DashboardChartProps) {
     const { user } = useAuth();
     const [data, setData] = useState<DailyStat[]>([]);
     const [loading, setLoading] = useState(true);
@@ -25,8 +29,32 @@ export default function DashboardChart() {
                     headers: createAuthHeaders(user.token),
                 });
                 if (res.ok) {
-                    const json = await res.json();
-                    setData(json);
+                    const json: DailyStat[] = await res.json();
+                    
+                    if (json.length > 0) {
+                        // Fill in missing dates from first scan to today
+                        const sorted = [...json].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                        const start = new Date(sorted[0].date);
+                        const end = new Date();
+                        const filled: DailyStat[] = [];
+                        
+                        // Normalize dates to YYYY-MM-DD for comparison
+                        const formatDate = (d: Date) => d.toISOString().split('T')[0];
+                        
+                        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                            const dateStr = formatDate(d);
+                            // Check if date exists in sorted data (handling potential time component mismatch)
+                            const existing = sorted.find(s => s.date.startsWith(dateStr));
+                            if (existing) {
+                                filled.push(existing);
+                            } else {
+                                filled.push({ date: dateStr, scanCount: 0, violationCount: 0, dollarsSaved: 0 });
+                            }
+                        }
+                        setData(filled);
+                    } else {
+                        setData([]);
+                    }
                 }
             } catch (e) {
                 console.error(e);
@@ -58,7 +86,15 @@ export default function DashboardChart() {
             <h3 className="text-lg font-semibold text-white mb-6">Security & Compliance Trends</h3>
             <div className="h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data}>
+                    <LineChart 
+                        data={data}
+                        onClick={(e: any) => {
+                            if (e && e.activePayload && e.activePayload.length > 0) {
+                                onDataPointClick?.(e.activePayload[0].payload as DailyStat);
+                            }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                    >
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                         <XAxis 
                             dataKey="date" 
@@ -67,13 +103,16 @@ export default function DashboardChart() {
                             tickLine={false}
                             axisLine={false}
                             tickFormatter={(value) => new Date(value).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
-                        />
+                        >
+                            <Label value="Timeline" offset={-5} position="insideBottom" fill="#71717a" style={{ fontSize: '12px' }} />
+                        </XAxis>
                         <YAxis 
                             yAxisId="left"
                             stroke="#71717a" 
                             tick={{fill: '#71717a'}}
                             tickLine={false}
                             axisLine={false}
+                            label={{ value: 'Scans Performed', angle: -90, position: 'insideLeft', fill: '#71717a', style: { textAnchor: 'middle' } }}
                         />
                         <YAxis 
                             yAxisId="right" 
@@ -82,14 +121,19 @@ export default function DashboardChart() {
                             tick={{fill: '#71717a'}}
                             tickLine={false}
                             axisLine={false}
-                            tickFormatter={(val) => `$${val}`}
+                            label={{ value: 'Violations Found', angle: 90, position: 'insideRight', fill: '#71717a', style: { textAnchor: 'middle' } }}
+                        />
+                        <YAxis 
+                            yAxisId="cost" 
+                            orientation="right" 
+                            hide
                         />
                         <Tooltip 
                             contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', color: '#fff' }}
                             itemStyle={{ color: '#fff' }}
                             labelStyle={{ color: '#a1a1aa' }}
                             formatter={(value: any, name: any) => {
-                                if (name === 'Cost Saved') return [`$${value}`, name];
+                                if (name === 'Cost Saved') return [`$${value.toLocaleString()}`, name];
                                 return [value, name];
                             }}
                         />
@@ -100,27 +144,28 @@ export default function DashboardChart() {
                             dataKey="scanCount" 
                             name="Scans"
                             stroke="#3b82f6" 
-                            strokeWidth={2}
+                            strokeWidth={3}
                             dot={{ fill: '#3b82f6', r: 4 }}
-                            activeDot={{ r: 6 }}
-                        />
-                        <Line 
-                            yAxisId="left"
-                            type="monotone" 
-                            dataKey="violationCount" 
-                            name="Violations"
-                            stroke="#ef4444" 
-                            strokeWidth={2}
-                            dot={{ fill: '#ef4444', r: 4 }}
                             activeDot={{ r: 6 }}
                         />
                         <Line 
                             yAxisId="right"
                             type="monotone" 
+                            dataKey="violationCount" 
+                            name="Violations"
+                            stroke="#ef4444" 
+                            strokeWidth={3}
+                            dot={{ fill: '#ef4444', r: 4 }}
+                            activeDot={{ r: 6 }}
+                        />
+                        <Line 
+                            yAxisId="cost"
+                            type="monotone" 
                             dataKey="dollarsSaved" 
                             name="Cost Saved"
                             stroke="#10b981" 
-                            strokeWidth={2}
+                            strokeWidth={3}
+                            strokeDasharray="5 5"
                             dot={{ fill: '#10b981', r: 4 }}
                             activeDot={{ r: 6 }}
                         />

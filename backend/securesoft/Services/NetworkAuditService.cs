@@ -1,4 +1,5 @@
-using SecureSoftAPI.Models;
+using ComplianceSecurityAuditor.Models;
+using ComplianceSecurityAuditor.Data;
 using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
@@ -14,9 +15,11 @@ namespace ComplianceSecurityAuditor.Services
     {
         private readonly HttpClient _httpClient;
         private readonly string _storagePath;
+        private readonly ISqlReportRepository _repo;
 
-        public NetworkAuditService()
+        public NetworkAuditService(ISqlReportRepository repo)
         {
+            _repo = repo;
             _storagePath = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "NetworkReports");
             Directory.CreateDirectory(_storagePath);
 
@@ -100,35 +103,13 @@ namespace ComplianceSecurityAuditor.Services
 
         public async Task SaveScanResultAsync(Guid userId, NetworkScanResult result)
         {
-            var userDir = Path.Combine(_storagePath, userId.ToString());
-            Directory.CreateDirectory(userDir);
-            
-            var filePath = Path.Combine(userDir, $"{result.Id}.json");
-            var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
-            
-            await File.WriteAllTextAsync(filePath, json);
+            // Save to DB
+            await _repo.SaveNetworkAuditAsync(userId, result);
         }
 
         public async Task<List<NetworkScanResult>> GetUserScanResultsAsync(Guid userId)
         {
-            var userDir = Path.Combine(_storagePath, userId.ToString());
-            if (!Directory.Exists(userDir)) return new List<NetworkScanResult>();
-
-            var results = new List<NetworkScanResult>();
-            var files = Directory.GetFiles(userDir, "*.json");
-
-            foreach (var file in files)
-            {
-                try
-                {
-                    var json = await File.ReadAllTextAsync(file);
-                    var result = JsonSerializer.Deserialize<NetworkScanResult>(json);
-                    if (result != null) results.Add(result);
-                }
-                catch { /* Ignore corrupt files */ }
-            }
-
-            return results.OrderByDescending(r => r.CreatedAt).ToList();
+            return await _repo.GetNetworkAuditsByUserAsync(userId);
         }
 
         private void AnalyzeHeaders(NetworkScanResult result)

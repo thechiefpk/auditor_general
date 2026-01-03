@@ -9,7 +9,7 @@ namespace ComplianceSecurityAuditor.Models
         public string Frequency { get; set; } // Hourly, Daily, Weekly, Monthly
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public string ScanType { get; set; } // Local, Git, Sql, Sonar, Network
+        public string ScanType { get; set; } // Local, Git, Sql, Network
         public string ConfigJson { get; set; } // JSON serialized config
         public DateTime? LastRun { get; set; }
         public DateTime NextRun { get; set; }

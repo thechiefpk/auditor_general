@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ComplianceSecurityAuditor.Services;
-using SecureSoftAPI.Models;
+using ComplianceSecurityAuditor.Models;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 

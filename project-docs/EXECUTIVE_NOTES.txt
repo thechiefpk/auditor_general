@@ -1,0 +1,19 @@
+-----------------------------------------------------------------------------------------------------------
+Compliar proj
+-----------------------------------------------------------------------------------------------------------
+-Test rigrous core features
+-Prepare value and justification scripts
+-Final report completion
+
+-----------------------------------------------------------------------------------------------------------
+Database:
+unthinkable: localhost\SQLEXPRESS
+local: DESKTOP-1AG89BB
+
+Backend api url:
+https://localhost:7120/api/auth/login
+
+Users:
+jack_sparrow : admin123
+kingslayer@gmail.com : King@123
+

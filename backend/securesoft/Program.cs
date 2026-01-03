@@ -70,9 +70,6 @@ builder.Services.AddScoped<NetworkAuditService>();
 // Register Scheduler Service
 builder.Services.AddHostedService<SchedulerService>();
 
-builder.Services.AddHttpClient<SonarQubeService>();
-builder.Services.AddScoped<SonarQubeService>();
-
 builder.Services.AddHangfire(configuration => configuration
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()

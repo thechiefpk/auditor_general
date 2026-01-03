@@ -86,14 +86,6 @@ namespace ComplianceSecurityAuditor.Services
                             hangfireJobId = BackgroundJob.Enqueue<ScanJobService>(s => s.RunSqlScan(jobId, schedule.UserId, sqlReq.Path, schedule.Id));
                         }
                         break;
-                        
-                    case "sonar":
-                        var sonarReq = JsonSerializer.Deserialize<SonarScanRequest>(schedule.ConfigJson, options);
-                        if (sonarReq != null)
-                        {
-                            hangfireJobId = BackgroundJob.Enqueue<ScanJobService>(s => s.RunSonarScan(jobId, schedule.UserId, sonarReq.ProjectPath, sonarReq.ProjectKey, sonarReq.Token, sonarReq.HostUrl, schedule.Id));
-                        }
-                        break;
                     
                     case "network":
                         var netConfig = JsonSerializer.Deserialize<NetworkScanConfig>(schedule.ConfigJson, options);

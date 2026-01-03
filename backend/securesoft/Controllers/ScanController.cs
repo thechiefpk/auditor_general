@@ -98,6 +98,75 @@ namespace ComplianceSecurityAuditor.Controllers
             return Ok(new { jobId });
         }
 
+        [HttpPost("scan/upload")]
+        [RequestSizeLimit(100 * 1024 * 1024)] // 100 MB limit
+        public async Task<IActionResult> UploadAndScan([FromForm] bool isAdvanced)
+        {
+            Guid userId;
+            try
+            {
+                userId = GetCurrentUserId();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+
+            var files = Request.Form.Files;
+            if (files == null || files.Count == 0)
+            {
+                return BadRequest(new { error = "No files uploaded." });
+            }
+
+            // Create a temporary directory for this scan
+            var tempPath = Path.Combine(Path.GetTempPath(), "SecureSoftScans", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempPath);
+
+            try
+            {
+                foreach (var file in files)
+                {
+                    // Use relative path if available (webkitRelativePath), otherwise just filename
+                    // Note: file.FileName usually contains the relative path for directory uploads in some browsers,
+                    // but we need to handle it carefully to prevent directory traversal.
+                    var relativePath = file.FileName.Replace("/", Path.DirectorySeparatorChar.ToString())
+                                                    .Replace("\\", Path.DirectorySeparatorChar.ToString());
+                    
+                    // Simple sanitization
+                    if (relativePath.StartsWith(Path.DirectorySeparatorChar.ToString())) relativePath = relativePath.Substring(1);
+                    if (relativePath.Contains("..")) relativePath = Path.GetFileName(relativePath); // Fallback to flat if suspicious
+
+                    var fullPath = Path.Combine(tempPath, relativePath);
+                    var dir = Path.GetDirectoryName(fullPath);
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+                    using (var stream = new FileStream(fullPath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+                }
+
+                if (isAdvanced)
+                {
+                    var isDockerRunning = await Utility.IsDockerRunningAsync();
+                    if (!isDockerRunning)
+                    {
+                        return BadRequest(new { error = "Advanced scan requires Docker to be running. Please start Docker Desktop." });
+                    }
+                }
+
+                var jobId = Guid.NewGuid().ToString("N");
+                var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunLocalScan(jobId, userId, tempPath, isAdvanced, null));
+                await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
+                
+                return Ok(new { jobId });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = $"Upload failed: {ex.Message}" });
+            }
+        }
+
         [HttpPost("scan/sql")]
         public async Task<IActionResult> EnqueueSqlScan([FromBody] ScanRequest request)
         {
@@ -130,18 +199,13 @@ namespace ComplianceSecurityAuditor.Controllers
             return Ok(new { jobId });
         }
 
-        [HttpPost("scan/sonar")]
-        public async Task<IActionResult> EnqueueSonarScan([FromBody] SonarScanRequest request)
-        {
-            if (request is null || string.IsNullOrWhiteSpace(request.ProjectPath) || string.IsNullOrWhiteSpace(request.ProjectKey) || string.IsNullOrWhiteSpace(request.Token))
-                return BadRequest(new { error = "Project Path, Key, and Token are required." });
-            
-            var path = Utility.NormalizePath(request.ProjectPath, out var normalizeError);
-            if (normalizeError is not null)
-                return BadRequest(new { error = normalizeError });
-            if (!Directory.Exists(path) && !System.IO.File.Exists(path))
-                return BadRequest(new { error = "Path does not exist.", path });
 
+        [HttpPost("scan/network")]
+        public async Task<IActionResult> EnqueueNetworkScan([FromBody] NetworkScanRequest request)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Url))
+                return BadRequest(new { error = "Request body must contain a non-empty 'url' field." });
+            
             Guid userId;
             try
             {
@@ -157,7 +221,7 @@ namespace ComplianceSecurityAuditor.Controllers
             }
 
             var jobId = Guid.NewGuid().ToString("N");
-            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunSonarScan(jobId, userId, path, request.ProjectKey, request.Token, request.HostUrl, null));
+            var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunNetworkScan(jobId, userId, request.Url, null));
             await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
             return Ok(new { jobId });
         }
@@ -177,8 +241,13 @@ namespace ComplianceSecurityAuditor.Controllers
 
             try
             {
-                var reports = await _complianceService.GetReportsByUserAsync(userId);
-                return Ok(reports);
+                var codeReports = await _complianceService.GetReportsByUserAsync(userId);
+                var networkReports = await _complianceService.GetNetworkAuditsByUserAsync(userId);
+                
+                return Ok(new { 
+                    codeScans = codeReports, 
+                    networkScans = networkReports 
+                });
             }
             catch (InvalidOperationException ex)
             {
@@ -353,6 +422,51 @@ namespace ComplianceSecurityAuditor.Controllers
                 Console.WriteLine($"Error exporting PDF: {ex}");
                 return StatusCode(500, new { error = ex.ToString() });
             }
+        }
+
+        [HttpGet("network-report/{id}")]
+        public async Task<IActionResult> GetNetworkReport(Guid id)
+        {
+            try
+            {
+                var report = await _complianceService.GetNetworkAuditByIdAsync(id);
+                if (report == null) return NotFound(new { error = "Report not found." });
+                return Ok(report);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpGet("network-report/{id}/export/csv")]
+        public async Task<IActionResult> ExportNetworkReportCsv(Guid id)
+        {
+            Guid userId;
+            try
+            {
+                userId = GetCurrentUserId();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { error = "Authentication required." });
+            }
+
+            var report = await _complianceService.GetNetworkAuditByIdAsync(id);
+            if (report == null) return NotFound(new { error = "Report not found." });
+
+            // Verify ownership
+            var userReports = await _complianceService.GetNetworkAuditsByUserAsync(userId);
+            if (!userReports.Any(r => r.Id == report.Id))
+                return NotFound(new { error = "Report not found or not owned by user." });
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Id,Url,StatusCode,StatusReason,SecurityScore,CreatedAt");
+            sb.AppendLine($"{report.Id},{EscapeCsv(report.Url)},{report.StatusCode},{EscapeCsv(report.StatusReason)},{report.SecurityScore},{report.CreatedAt:O}");
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var fileName = $"network_report_{id}.csv";
+            return File(bytes, "text/csv", fileName);
         }
 
         private static string EscapeCsv(string input)

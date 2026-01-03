@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { API_ENDPOINTS, createAuthHeaders, apiRequest } from '@/app/lib/api';
-import DashboardChart from '@/app/components/DashboardChart';
+import DashboardChart, { DailyStat } from '@/app/components/DashboardChart';
 
 interface AuditRule {
   ruleId: string;
@@ -29,6 +29,20 @@ interface ScanReport {
   scanPath?: string;
 }
 
+interface NetworkScanResult {
+  id: string;
+  url: string;
+  statusCode: number;
+  statusReason?: string;
+  securityScore: number;
+  createdAt: string;
+}
+
+interface ReportsResponse {
+  codeScans: ScanReport[];
+  networkScans: NetworkScanResult[];
+}
+
 interface DashboardStats {
   totalScans: number;
   activeScans: number;
@@ -47,6 +61,7 @@ export default function DashboardPage() {
     recentReports: [],
   });
   const [loading, setLoading] = useState(true);
+  const [selectedDateStat, setSelectedDateStat] = useState<DailyStat | null>(null);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -58,7 +73,7 @@ export default function DashboardPage() {
     
     setLoading(true);
     try {
-      const result = await apiRequest<ScanReport[]>(
+      const result = await apiRequest<ReportsResponse>(
         API_ENDPOINTS.MY_REPORTS,
         {
           method: 'GET',
@@ -67,11 +82,15 @@ export default function DashboardPage() {
       );
 
       if (result.data) {
-        const reports = result.data;
+        const codeScans = result.data.codeScans || [];
+        const networkScans = result.data.networkScans || [];
         
         // Calculate stats from reports
-        const totalViolations = reports.reduce((sum, r) => sum + r.violationsFound, 0);
-        const criticalViolations = reports.reduce((sum, r) => {
+        const codeViolations = codeScans.reduce((sum, r) => sum + r.violationsFound, 0);
+        const networkViolations = networkScans.reduce((sum, r) => sum + Math.max(0, Math.floor((100 - r.securityScore) / 5)), 0);
+        const totalViolations = codeViolations + networkViolations;
+
+        const criticalCodeViolations = codeScans.reduce((sum, r) => {
           const critical = r.violations.filter(v => 
             v.violatedRule.category === 'Security' || 
             v.violatedRule.category === 'GDPR' ||
@@ -79,13 +98,16 @@ export default function DashboardPage() {
           ).length;
           return sum + critical;
         }, 0);
+        
+        // Estimate critical network issues (Score < 70 implies significant security gaps)
+        const criticalNetworkViolations = networkScans.filter(r => r.securityScore < 70).length;
 
         setStats({
-          totalScans: reports.length,
+          totalScans: codeScans.length + networkScans.length,
           activeScans: 0, // Backend doesn't provide this yet
           totalViolations: totalViolations,
-          criticalIssues: criticalViolations,
-          recentReports: reports.slice(0, 5), // Get 5 most recent
+          criticalIssues: criticalCodeViolations + criticalNetworkViolations,
+          recentReports: codeScans.slice(0, 5), // Get 5 most recent code scans
         });
       }
     } catch (error) {
@@ -115,9 +137,9 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      title: 'Total Scans',
-      value: stats.totalScans,
-      change: stats.totalScans > 0 ? `+${stats.totalScans} total` : 'No scans',
+      title: selectedDateStat ? `Scans (${new Date(selectedDateStat.date).toLocaleDateString()})` : 'Total Scans',
+      value: selectedDateStat ? selectedDateStat.scanCount : stats.totalScans,
+      change: selectedDateStat ? 'On Selected Date' : (stats.totalScans > 0 ? `+${stats.totalScans} total` : 'No scans'),
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -135,9 +157,9 @@ export default function DashboardPage() {
       ),
     },
     {
-      title: 'Total Violations',
-      value: stats.totalViolations,
-      change: 'Detected',
+      title: selectedDateStat ? `Violations (${new Date(selectedDateStat.date).toLocaleDateString()})` : 'Total Violations',
+      value: selectedDateStat ? selectedDateStat.violationCount : stats.totalViolations,
+      change: selectedDateStat ? 'On Selected Date' : 'Detected',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -145,9 +167,9 @@ export default function DashboardPage() {
       ),
     },
     {
-      title: 'Critical Issues',
-      value: stats.criticalIssues,
-      change: 'High Severity',
+      title: selectedDateStat ? `Cost Saved (${new Date(selectedDateStat.date).toLocaleDateString()})` : 'Critical Issues',
+      value: selectedDateStat ? `$${selectedDateStat.dollarsSaved.toLocaleString()}` : stats.criticalIssues,
+      change: selectedDateStat ? 'On Selected Date' : 'High Severity',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -177,8 +199,22 @@ export default function DashboardPage() {
 
       {/* Chart Section - Top Highlight */}
       <div className="w-full">
-         <DashboardChart />
+         <DashboardChart onDataPointClick={setSelectedDateStat} />
       </div>
+
+      {selectedDateStat && (
+          <div className="flex justify-end -mt-4 mb-4">
+              <button 
+                  onClick={() => setSelectedDateStat(null)}
+                  className="text-xs text-zinc-400 hover:text-white transition-colors flex items-center gap-2 bg-zinc-800 px-3 py-1.5 rounded-md border border-zinc-700"
+              >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Reset View (Showing {new Date(selectedDateStat.date).toLocaleDateString()})
+              </button>
+          </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">

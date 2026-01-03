@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { API_ENDPOINTS, createAuthHeaders } from '@/app/lib/api';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 interface Schedule {
   id: string;
@@ -37,6 +38,7 @@ export default function AutomationPage() {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
 
   // Form State
   const [frequency, setFrequency] = useState('Daily');
@@ -48,8 +50,8 @@ export default function AutomationPage() {
   const [path, setPath] = useState('');
   const [gitUrl, setGitUrl] = useState('');
   const [gitBranch, setGitBranch] = useState('');
-  const [projectKey, setProjectKey] = useState('');
   const [targetIp, setTargetIp] = useState('');
+  const [runImmediately, setRunImmediately] = useState(false);
 
   useEffect(() => {
     fetchSchedules();
@@ -73,12 +75,13 @@ export default function AutomationPage() {
     }
   };
 
-  const fetchHistory = async (scheduleId: string) => {
+  const fetchHistory = async (schedule: Schedule) => {
       setLoadingHistory(true);
       setIsHistoryModalOpen(true);
       setHistoryItems([]);
+      setSelectedSchedule(schedule);
       try {
-          const res = await fetch(`${API_ENDPOINTS.SCHEDULE_BASE || '/api/schedules'}/${scheduleId}/history`, {
+          const res = await fetch(`${API_ENDPOINTS.SCHEDULE_BASE || '/api/schedules'}/${schedule.id}/history`, {
               headers: createAuthHeaders(user?.token),
           });
           if (res.ok) {
@@ -92,6 +95,26 @@ export default function AutomationPage() {
       } finally {
           setLoadingHistory(false);
       }
+  };
+
+  const handleExecuteNow = async (scheduleId: string) => {
+    try {
+        const toastId = toast.loading('Triggering scan...');
+        const res = await fetch(`${API_ENDPOINTS.SCHEDULE_BASE || '/api/schedules'}/${scheduleId}/execute`, {
+            method: 'POST',
+            headers: createAuthHeaders(user?.token),
+        });
+        
+        if (res.ok) {
+            toast.success('Scan triggered successfully', { id: toastId });
+            // Optionally, we could start polling for status if we wanted, 
+            // but for now, the user can just check the history or reports later.
+        } else {
+            toast.error('Failed to trigger scan', { id: toastId });
+        }
+    } catch {
+        toast.error('Failed to trigger scan');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -126,9 +149,6 @@ export default function AutomationPage() {
     } else if (scanType === 'git') {
         if (!gitUrl) { toast.error('Repo URL is required'); return; }
         config = { repositoryUrl: gitUrl, branch: gitBranch };
-    } else if (scanType === 'sonar') {
-        if (!projectKey) { toast.error('Project Key is required'); return; }
-        config = { projectKey };
     } else if (scanType === 'network') {
         if (!targetIp) { toast.error('Target IP is required'); return; }
         config = { target: targetIp };
@@ -151,7 +171,13 @@ export default function AutomationPage() {
         });
         
         if (res.ok) {
+            const createdSchedule = await res.json();
             toast.success('Schedule created successfully');
+            
+            if (runImmediately && createdSchedule.id) {
+                await handleExecuteNow(createdSchedule.id);
+            }
+
             setIsModalOpen(false);
             fetchSchedules();
             resetForm();
@@ -171,8 +197,8 @@ export default function AutomationPage() {
     setPath('');
     setGitUrl('');
     setGitBranch('');
-    setProjectKey('');
     setTargetIp('');
+    setRunImmediately(false);
   };
 
   return (
@@ -211,7 +237,7 @@ export default function AutomationPage() {
         <div className="grid gap-4">
             {schedules.map(schedule => (
                 <div key={schedule.id} className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 flex items-center justify-between group hover:border-zinc-700 transition-all">
-                    <div className="flex items-start gap-4">
+                    <Link href={`/dashboard/automation/${schedule.id}`} className="flex items-start gap-4 flex-1 cursor-pointer">
                         <div className={`p-3 rounded-lg ${
                             schedule.scanType === 'local' ? 'bg-blue-500/10 text-blue-500' :
                             schedule.scanType === 'git' ? 'bg-purple-500/10 text-purple-500' :
@@ -240,10 +266,20 @@ export default function AutomationPage() {
                                 <p>Last Run: {schedule.lastRun ? new Date(schedule.lastRun).toLocaleString() : 'Never'}</p>
                             </div>
                         </div>
-                    </div>
+                    </Link>
                     <div className="flex items-center gap-4">
                         <button 
-                            onClick={() => fetchHistory(schedule.id)}
+                            onClick={() => handleExecuteNow(schedule.id)}
+                            className="p-2 text-zinc-500 hover:text-green-400 transition-colors"
+                            title="Run Now"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+                        <button 
+                            onClick={() => fetchHistory(schedule)}
                             className="p-2 text-zinc-500 hover:text-blue-400 transition-colors"
                             title="View History"
                         >
@@ -309,8 +345,20 @@ export default function AutomationPage() {
                                         </div>
                                     )}
                                     {item.resultSummary && item.status === 'Success' && (
-                                        <div className="mt-2 text-sm text-zinc-400">
-                                            Report ID: <span className="text-zinc-300 font-mono">{item.resultSummary}</span>
+                                        <div className="mt-2 text-sm text-zinc-400 flex items-center gap-2">
+                                            <span>Report ID: <span className="text-zinc-300 font-mono">{item.resultSummary.substring(0, 8)}...</span></span>
+                                            <Link 
+                                                href={selectedSchedule?.scanType === 'network' 
+                                                    ? `/dashboard/reports/network/${item.resultSummary}` 
+                                                    : `/dashboard/reports/${item.resultSummary}`
+                                                }
+                                                className="text-blue-400 hover:text-blue-300 hover:underline ml-2 flex items-center gap-1"
+                                            >
+                                                View Report
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                            </Link>
                                         </div>
                                     )}
                                 </div>
@@ -359,8 +407,7 @@ export default function AutomationPage() {
                             >
                                 <option value="local">Local Scan</option>
                                 <option value="git">Git Repository</option>
-                                <option value="sql">SQL Scan</option>
-                                <option value="sonar">SonarQube</option>
+                                <option value="sql">SQL Vulnerability Scan</option>
                                 <option value="network">Network Audit</option>
                             </select>
                         </div>
@@ -434,20 +481,6 @@ export default function AutomationPage() {
                             </div>
                         )}
 
-                        {scanType === 'sonar' && (
-                            <div>
-                                <label className="block text-sm font-medium text-zinc-400 mb-2">Project Key</label>
-                                <input 
-                                    type="text"
-                                    value={projectKey}
-                                    onChange={(e) => setProjectKey(e.target.value)}
-                                    placeholder="my-project-key"
-                                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                    required
-                                />
-                            </div>
-                        )}
-
                         {scanType === 'network' && (
                             <div>
                                 <label className="block text-sm font-medium text-zinc-400 mb-2">Target IP / Range</label>
@@ -461,6 +494,19 @@ export default function AutomationPage() {
                                 />
                             </div>
                         )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="runImmediately"
+                            checked={runImmediately}
+                            onChange={(e) => setRunImmediately(e.target.checked)}
+                            className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-blue-500/50 focus:ring-offset-0"
+                        />
+                        <label htmlFor="runImmediately" className="text-sm text-zinc-400 select-none cursor-pointer">
+                            Execute immediately after creation
+                        </label>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">

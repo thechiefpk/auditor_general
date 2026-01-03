@@ -49,6 +49,7 @@ export default function ScanPage() {
   // Selection State
   const [selectedScanType, setSelectedScanType] = useState<ScanType>(null);
   const [isConsentOpen, setIsConsentOpen] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<FileList | null>(null);
 
   // Form Inputs
   const [path, setPath] = useState('');
@@ -295,9 +296,11 @@ export default function ScanPage() {
     e.preventDefault();
     
     // Validation
-    if ((selectedScanType === 'local' || selectedScanType === 'sql' || (selectedScanType === 'advanced' && advancedTarget === 'local')) && !path.trim()) {
-      toast.error('Please enter a path to scan');
-      return;
+    if ((selectedScanType === 'local' || selectedScanType === 'sql' || (selectedScanType === 'advanced' && advancedTarget === 'local'))) {
+        if (!path.trim() && !uploadFiles) {
+            toast.error('Please enter a path or select files to scan');
+            return;
+        }
     }
     
     if ((selectedScanType === 'git' || (selectedScanType === 'advanced' && advancedTarget === 'git')) && !gitUrl.trim()) {
@@ -343,8 +346,44 @@ export default function ScanPage() {
         isAdvanced
       };
     } else {
-      url = API_ENDPOINTS.SCAN_LOCAL;
-      body = { path: path.trim(), isAdvanced };
+        if (uploadFiles && uploadFiles.length > 0) {
+            // Upload Flow
+            url = API_ENDPOINTS.SCAN_UPLOAD;
+            const formData = new FormData();
+            formData.append('isAdvanced', String(isAdvanced));
+            
+            for (let i = 0; i < uploadFiles.length; i++) {
+                formData.append('files', uploadFiles[i]);
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        // Don't set Content-Type, let browser set it with boundary
+                        'Authorization': `Bearer ${user?.token}`
+                    },
+                    body: formData,
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    const jobId = data.jobId as string;
+                    localStorage.setItem(getJobStorageKey(), jobId);
+                    startPolling(jobId);
+                } else {
+                    toast.error((data as any).error || 'Upload scan failed');
+                    setIsScanning(false);
+                }
+            } catch (error) {
+                toast.error('An error occurred during upload');
+                setIsScanning(false);
+            }
+            return;
+        } else {
+            // Path Flow
+            url = API_ENDPOINTS.SCAN_LOCAL;
+            body = { path: path.trim(), isAdvanced };
+        }
     }
 
     try {
@@ -494,21 +533,105 @@ export default function ScanPage() {
             {/* Inputs based on type */}
             {(isLocal || isSql || (isAdvanced && advancedTarget === 'local')) && (
                 <div>
-                    <label htmlFor="path" className="block text-sm font-medium text-zinc-300 mb-2">
-                        {isSql ? 'SQL Directory or File Path' : 'Directory or File Path'}
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">
+                        {isSql ? 'Scan SQL Files' : 'Scan Source Code'}
                     </label>
-                    <input
-                        type="text"
-                        id="path"
-                        value={path}
-                        onChange={(e) => setPath(e.target.value)}
-                        placeholder={isSql ? "e.g., C:\\Projects\\Database\\Scripts" : "e.g., C:\\Projects\\MyApp"}
-                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
-                        disabled={isScanning}
-                    />
-                    <p className="mt-2 text-sm text-zinc-500">
-                        Enter the absolute path to the directory or file on the server.
-                    </p>
+                    
+                    {/* Tabs for Path vs Upload */}
+                    <div className="space-y-4">
+                        <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
+                             <div className="flex flex-col gap-2">
+                                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Option 1: Enter Path (Server-Side)</label>
+                                <input
+                                    type="text"
+                                    value={path}
+                                    onChange={(e) => {
+                                        setPath(e.target.value);
+                                        setUploadFiles(null); // Clear upload if path is typed
+                                    }}
+                                    placeholder={isSql ? "e.g., C:\\Projects\\Database\\Scripts" : "e.g., C:\\Projects\\MyApp"}
+                                    className="w-full rounded-lg border border-zinc-800 bg-black/20 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
+                                    disabled={isScanning || (uploadFiles !== null && uploadFiles.length > 0)}
+                                />
+                             </div>
+
+                             <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-zinc-800"></div>
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-zinc-900 px-2 text-zinc-500">Or Select From Computer</span>
+                                </div>
+                             </div>
+
+                             <div className="flex flex-col gap-2">
+                                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Option 2: Upload Folder/File</label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <input
+                                            type="file"
+                                            id="folder-upload"
+                                            // @ts-ignore - webkitdirectory is standard in modern browsers but missing in some TS definitions
+                                            webkitdirectory="" 
+                                            directory=""
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files.length > 0) {
+                                                    setUploadFiles(e.target.files);
+                                                    setPath(''); // Clear path if file selected
+                                                }
+                                            }}
+                                            className="hidden"
+                                            disabled={isScanning}
+                                        />
+                                        <label 
+                                            htmlFor="folder-upload"
+                                            className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer hover:bg-zinc-800/50 transition-all ${uploadFiles ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700'}`}
+                                        >
+                                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <svg className={`w-8 h-8 mb-2 ${uploadFiles ? 'text-blue-500' : 'text-zinc-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                                </svg>
+                                                <p className="text-sm text-zinc-400">
+                                                    {uploadFiles ? (
+                                                        <span className="text-blue-400 font-medium">{uploadFiles.length} files selected</span>
+                                                    ) : (
+                                                        <span className="text-zinc-500">Click to select a <span className="font-semibold text-zinc-300">Folder</span></span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    
+                                    {/* Single File Fallback (if they want just one file) */}
+                                     <div className="relative w-1/3">
+                                        <input
+                                            type="file"
+                                            id="file-upload"
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files.length > 0) {
+                                                    setUploadFiles(e.target.files);
+                                                    setPath(''); 
+                                                }
+                                            }}
+                                            className="hidden"
+                                            disabled={isScanning}
+                                        />
+                                        <label 
+                                            htmlFor="file-upload"
+                                            className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-zinc-700 rounded-lg cursor-pointer hover:bg-zinc-800/50 transition-all"
+                                        >
+                                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <svg className="w-8 h-8 mb-2 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <p className="text-sm text-zinc-500">Select <span className="font-semibold text-zinc-300">File</span></p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -669,6 +792,7 @@ export default function ScanPage() {
         onConfirm={executeScan}
         scanType={selectedScanType || 'local'}
       />
+
     </div>
   );
 }
