@@ -118,7 +118,7 @@ export default function ScheduleDetailPage({ params }: { params: Promise<{ id: s
         try {
             if (data.configJson) {
                 const config = JSON.parse(data.configJson);
-                if (data.scanType === 'local' || data.scanType === 'sql') {
+                if (data.scanType === 'local') {
                     setPath(config.path || '');
                 } else if (data.scanType === 'git') {
                     setGitUrl(config.repositoryUrl || '');
@@ -141,7 +141,7 @@ export default function ScheduleDetailPage({ params }: { params: Promise<{ id: s
 
         setSaving(true);
         let config: any = {};
-        if (scanType === 'local' || scanType === 'sql') {
+        if (scanType === 'local') {
             if (!path) { toast.error('Path is required'); setSaving(false); return; }
             config = { path };
         } else if (scanType === 'git') {
@@ -266,7 +266,6 @@ export default function ScheduleDetailPage({ params }: { params: Promise<{ id: s
                                 >
                                     <option value="local">Local Scan</option>
                                     <option value="git">Git Repository</option>
-                                    <option value="sql">SQL Vulnerability Scan</option>
                                     <option value="network">Network Audit</option>
                                 </select>
                             </div>
@@ -293,7 +292,7 @@ export default function ScheduleDetailPage({ params }: { params: Promise<{ id: s
                             </div>
                         </div>
 
-                        {(scanType === 'local' || scanType === 'sql') && (
+                        {scanType === 'local' && (
                             <div>
                                 <label className="block text-sm font-medium text-zinc-400 mb-2">Directory Path</label>
                                 <input 

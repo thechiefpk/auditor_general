@@ -483,20 +483,17 @@ namespace ComplianceSecurityAuditor.Controllers
             if (request is null || string.IsNullOrWhiteSpace(request.RepositoryUrl))
                 return BadRequest(new { error = "Repository URL is required." });
 
-            // Enforce Public Only - Ignore or Warn if Token provided?
-            // We just validate WITHOUT token to ensure it is public.
-            var result = ValidateGitAccess(request.RepositoryUrl, null); // Pass null for token to force public check
+            if (!IsValidGitUrl(request.RepositoryUrl))
+                return Ok(new { valid = false, error = "Invalid Git repository URL format." });
+
+            var result = ValidateGitAccess(request.RepositoryUrl, null);
 
             if (result.Success)
             {
                 return Ok(new { valid = true });
             }
-            else
-            {
-                // If it failed, it might be private or invalid.
-                // We can't distinguish easily without parsing specific git errors, but for our purpose:
-                return Ok(new { valid = false, error = "Repository is not accessible. Ensure it is public and the URL is correct." });
-            }
+
+            return Ok(new { valid = false, error = result.Message });
         }
 
         /// <summary>
@@ -526,13 +523,6 @@ namespace ComplianceSecurityAuditor.Controllers
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { error = ex.Message });
-            }
-
-            // Verify Git access/credentials - FORCE PUBLIC (Pass null token)
-            var validationResult = ValidateGitAccess(request.RepositoryUrl, null);
-            if (!validationResult.Success)
-            {
-                return BadRequest(new { error = $"Git validation failed: {validationResult.Message}. Only PUBLIC repositories are supported." });
             }
 
             if (request.IsAdvanced)
@@ -697,39 +687,41 @@ namespace ComplianceSecurityAuditor.Controllers
                 {
                     FileName = "git",
                     Arguments = $"ls-remote \"{checkUrl}\"",
-                    RedirectStandardOutput = true,
+                    RedirectStandardOutput = false,
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
 
-                // Disable interactive prompts and credential helpers
                 processStartInfo.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
                 processStartInfo.EnvironmentVariables["GCM_INTERACTIVE"] = "never";
-
-                // Ensure we don't use global/system config that might have helpers configured
-                // Note: -c credential.helper= overrides any helpers to be empty for this command
                 processStartInfo.Arguments = $"-c credential.helper= ls-remote \"{checkUrl}\"";
 
                 using var process = new Process { StartInfo = processStartInfo };
                 process.Start();
-                
-                // Wait up to 15 seconds for validation
-                var completed = process.WaitForExit(15000);
-                
+
+                var completed = process.WaitForExit(60000);
                 if (!completed)
                 {
                     process.Kill();
-                    return (false, "Connection timed out");
+                    return (false, "Connection timed out while contacting git host");
                 }
 
                 var error = process.StandardError.ReadToEnd();
                 if (process.ExitCode != 0)
                 {
-                    // Clean up error message to avoid exposing tokens if any (though git usually masks them)
-                    // But we constructed the URL with token, so we should be careful.
-                    // The error from git usually says "Authentication failed" or "Repository not found".
-                    return (false, "Access denied or repository not found");
+                    var err = error?.ToLowerInvariant() ?? string.Empty;
+                    if (err.Contains("authentication failed") || err.Contains("permission denied"))
+                        return (false, "Authentication failed or repository is private");
+                    if (err.Contains("not found") || err.Contains("repository not found"))
+                        return (false, "Repository not found. Check the URL or visibility.");
+                    if (err.Contains("could not resolve host") || err.Contains("name or service not known") || err.Contains("temporary failure"))
+                        return (false, "Network or DNS error while contacting git host");
+                    if (err.Contains("ssl") || err.Contains("tls"))
+                        return (false, "TLS/SSL error while contacting git host");
+
+                    var trimmed = (error ?? string.Empty).Trim();
+                    return (false, string.IsNullOrEmpty(trimmed) ? "git ls-remote failed with unknown error" : trimmed);
                 }
 
                 return (true, "OK");
@@ -790,28 +782,5 @@ namespace ComplianceSecurityAuditor.Controllers
                 return false;
             }
         }
-    }
-
-    /// <summary>
-    /// Request model for scanning Git repositories
-    /// </summary>
-    public class GitScanRequest
-    {
-        /// <summary>
-        /// Git repository URL (HTTPS or SSH)
-        /// </summary>
-        public string RepositoryUrl { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Optional: Branch name to scan (default: main/master)
-        /// </summary>
-        public string? Branch { get; set; }
-
-        /// <summary>
-        /// Optional: Personal Access Token for private repositories
-        /// </summary>
-        public string? AccessToken { get; set; }
-
-        public bool IsAdvanced { get; set; }
     }
 }

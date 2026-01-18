@@ -143,7 +143,7 @@ export default function AutomationPage() {
     }
 
     let config: any = {};
-    if (scanType === 'local' || scanType === 'sql') {
+    if (scanType === 'local') {
         if (!path) { toast.error('Path is required'); return; }
         config = { path };
     } else if (scanType === 'git') {
@@ -241,7 +241,6 @@ export default function AutomationPage() {
                         <div className={`p-3 rounded-lg ${
                             schedule.scanType === 'local' ? 'bg-blue-500/10 text-blue-500' :
                             schedule.scanType === 'git' ? 'bg-purple-500/10 text-purple-500' :
-                            schedule.scanType === 'sql' ? 'bg-emerald-500/10 text-emerald-500' :
                             schedule.scanType === 'network' ? 'bg-orange-500/10 text-orange-500' :
                             'bg-pink-500/10 text-pink-500'
                         }`}>
@@ -407,7 +406,6 @@ export default function AutomationPage() {
                             >
                                 <option value="local">Local Scan</option>
                                 <option value="git">Git Repository</option>
-                                <option value="sql">SQL Vulnerability Scan</option>
                                 <option value="network">Network Audit</option>
                             </select>
                         </div>
@@ -439,10 +437,10 @@ export default function AutomationPage() {
                     <div className="pt-4 border-t border-zinc-800">
                         <h3 className="text-sm font-medium text-zinc-300 mb-4 uppercase tracking-wider">Configuration</h3>
                         
-                        {(scanType === 'local' || scanType === 'sql') && (
+                        {scanType === 'local' && (
                             <div>
                                 <label className="block text-sm font-medium text-zinc-400 mb-2">
-                                    {scanType === 'sql' ? 'SQL Directory Path' : 'Directory Path'}
+                                    Directory Path
                                 </label>
                                 <input 
                                     type="text"

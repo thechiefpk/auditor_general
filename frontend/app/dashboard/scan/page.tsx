@@ -40,7 +40,7 @@ interface DisplayViolation {
   ruleId: string;
 }
 
-type ScanType = 'local' | 'git' | 'advanced' | 'sql' | null;
+type ScanType = 'local' | 'git' | 'advanced' | null;
 
 export default function ScanPage() {
   const { user } = useAuth();
@@ -296,7 +296,7 @@ export default function ScanPage() {
     e.preventDefault();
     
     // Validation
-    if ((selectedScanType === 'local' || selectedScanType === 'sql' || (selectedScanType === 'advanced' && advancedTarget === 'local'))) {
+    if ((selectedScanType === 'local' || (selectedScanType === 'advanced' && advancedTarget === 'local'))) {
         if (!path.trim() && !uploadFiles) {
             toast.error('Please enter a path or select files to scan');
             return;
@@ -329,16 +329,12 @@ export default function ScanPage() {
     
     const isAdvanced = selectedScanType === 'advanced';
     const isGit = selectedScanType === 'git' || (isAdvanced && advancedTarget === 'git');
-    const isSql = selectedScanType === 'sql';
-    const isLocal = !isGit && !isSql; // 'local' or advanced local
+    const isLocal = !isGit;
 
     let url = '';
     let body = {};
 
-    if (isSql) {
-      url = API_ENDPOINTS.SCAN_SQL;
-      body = { path: path.trim() };
-    } else if (isGit) {
+    if (isGit) {
       url = API_ENDPOINTS.SCAN_GIT;
       body = { 
         repositoryUrl: gitUrl.trim(),
@@ -462,27 +458,12 @@ export default function ScanPage() {
         <p className="text-zinc-400 text-sm">Uses a 3rd party engine to detect complex data flow and privacy vulnerabilities.</p>
       </button>
 
-      {/* SQL Scan Tile */}
-      <button
-        onClick={() => setSelectedScanType('sql')}
-        disabled={isScanning}
-        className="flex flex-col items-start p-6 bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl hover:bg-zinc-800/40 hover:border-zinc-700 transition-all text-left group"
-      >
-        <div className="p-3 bg-emerald-500/10 rounded-lg mb-4 group-hover:bg-emerald-500/20 transition-colors">
-          <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-          </svg>
-        </div>
-        <h3 className="text-xl font-semibold text-white mb-2">SQL & Schema Scan</h3>
-        <p className="text-zinc-400 text-sm">Analyze SQL files and schemas for security best practices and quality issues.</p>
-      </button>
     </div>
   );
 
   const renderForm = () => {
     const isAdvanced = selectedScanType === 'advanced';
     const isGit = selectedScanType === 'git';
-    const isSql = selectedScanType === 'sql';
     const isLocal = selectedScanType === 'local';
 
     return (
@@ -501,7 +482,6 @@ export default function ScanPage() {
             <h2 className="text-2xl font-bold text-white">
                 {isLocal && 'Local Scan'}
                 {isGit && 'Git Repository Scan'}
-                {isSql && 'SQL & Schema Scan'}
                 {isAdvanced && 'Advanced Deep Scan'}
             </h2>
         </div>
@@ -531,10 +511,10 @@ export default function ScanPage() {
             )}
 
             {/* Inputs based on type */}
-            {(isLocal || isSql || (isAdvanced && advancedTarget === 'local')) && (
+            {(isLocal || (isAdvanced && advancedTarget === 'local')) && (
                 <div>
                     <label className="block text-sm font-medium text-zinc-300 mb-2">
-                        {isSql ? 'Scan SQL Files' : 'Scan Source Code'}
+                        Scan Source Code
                     </label>
                     
                     {/* Tabs for Path vs Upload */}
@@ -542,17 +522,17 @@ export default function ScanPage() {
                         <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
                              <div className="flex flex-col gap-2">
                                 <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Option 1: Enter Path (Server-Side)</label>
-                                <input
-                                    type="text"
-                                    value={path}
-                                    onChange={(e) => {
-                                        setPath(e.target.value);
-                                        setUploadFiles(null); // Clear upload if path is typed
-                                    }}
-                                    placeholder={isSql ? "e.g., C:\\Projects\\Database\\Scripts" : "e.g., C:\\Projects\\MyApp"}
-                                    className="w-full rounded-lg border border-zinc-800 bg-black/20 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
-                                    disabled={isScanning || (uploadFiles !== null && uploadFiles.length > 0)}
-                                />
+                                        <input
+                                            type="text"
+                                            value={path}
+                                            onChange={(e) => {
+                                                setPath(e.target.value);
+                                                setUploadFiles(null);
+                                            }}
+                                            placeholder="e.g., C:\\Projects\\MyApp"
+                                            className="w-full rounded-lg border border-zinc-800 bg-black/20 px-4 py-3 text-white placeholder-zinc-600 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 focus:outline-none transition-all"
+                                            disabled={isScanning || (uploadFiles !== null && uploadFiles.length > 0)}
+                                        />
                              </div>
 
                              <div className="relative">

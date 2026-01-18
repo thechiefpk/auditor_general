@@ -4,7 +4,7 @@ interface ConsentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  scanType: 'local' | 'git' | 'advanced' | 'sql';
+  scanType: 'local' | 'git' | 'advanced';
 }
 
 export default function ConsentModal({ isOpen, onClose, onConfirm, scanType }: ConsentModalProps) {
