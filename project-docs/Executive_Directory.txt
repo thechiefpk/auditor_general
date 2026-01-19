@@ -228,3 +228,7 @@ Slide: Value for Organizations
 - Detect early signs of data leakage in their public pages.
 - Track their security posture over time through stored reports and PDFs.
 Because the scanner is external and non‑intrusive, it can be run safely against production systems to validate hardening measures before and after changes.”
+
+- toolNames is ["Microsoft Presidio", "Semgrep"] and progress updates use those names.
+
+

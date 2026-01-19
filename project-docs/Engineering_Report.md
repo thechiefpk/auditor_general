@@ -27,7 +27,6 @@ graph TD
         Services -->|CRUD| DB[(SQL Server)]
         HF -->|Async Execution| ScanEngine[Scan Logic / Validation Engine]
         ScanEngine -->|Updates| DB
-        ScanEngine -->|Docker CLI| Privado[Privado Scanner (Docker)]
     end
 ```
 
@@ -36,7 +35,7 @@ graph TD
 *   **Backend**: .NET 8 (ASP.NET Core Web API), C#.
 *   **Database**: Microsoft SQL Server.
 *   **Background Jobs**: Hangfire (running in-process with the API).
-*   **External Tools**: Docker (for advanced Privado scanning), Git CLI.
+*   **External Tools**: Git CLI, Microsoft Presidio, Semgrep.
 
 ---
 
@@ -82,7 +81,6 @@ The frontend is built with **Next.js (App Router)**, emphasizing server-side ren
 *   **`dashboard/layout.tsx`**:
     *   **Role**: Protected route wrapper.
     *   **Logic**: Checks `!isLoading && !user` to redirect unauthenticated users to `/login`.
-    *   **Docker Check**: Automatically polls the backend to see if Docker is running for advanced features.
 *   **`lib/api.ts`**:
     *   **Role**: Centralized API configuration.
     *   **Features**: Defines `API_BASE_URL` (configurable via ENV), endpoint constants, and a wrapper `apiRequest` function for standardized error handling.
@@ -91,6 +89,7 @@ The frontend is built with **Next.js (App Router)**, emphasizing server-side ren
 *   **`ScanPage` (`dashboard/scan/page.tsx`)**:
     *   Complex state management for Form inputs (Path, Git URL) and Progress visualization (Progress Bar, Stage Text).
     *   Handles the transition from "Input Mode" -> "Scanning Mode" -> "Results Mode".
+    *   Supports an advanced deep scan pipeline powered by Microsoft Presidio and Semgrep.
 *   **`ReportsPage` (`dashboard/reports/page.tsx`)**:
     *   Fetches list of reports.
     *   Provides links to detailed views (`/dashboard/reports/[id]`).
@@ -105,9 +104,9 @@ The backend is a monolithic **ASP.NET Core Web API** following a layered archite
 *   **`Controllers/`**: Entry points (API Endpoints).
     *   `ScanController`: Handles scan requests, progress checks, and report retrieval.
     *   `AuthController`: Handles Login/Register.
-    *   `SystemController`: Manages system-level checks (Docker status).
+    *   `SystemController`: Manages system-level checks and environment validation.
 *   **`Services/`**: Business Logic.
-    *   `ScanJobService`: The **Hangfire** job runner. Orchestrates the scanning process (Clone -> Compliance Scan -> Privado Scan -> Save).
+    *   `ScanJobService`: The **Hangfire** job runner. Orchestrates the scanning process (Clone -> Compliance Scan -> Advanced Deep Scan -> Save).
     *   `ComplianceService`: Facade for report and statistic retrieval.
     *   `AuthService`: JWT generation logic.
 *   **`Data/`**: Data Access Layer (DAL).
@@ -129,9 +128,9 @@ The backend is a monolithic **ASP.NET Core Web API** following a layered archite
 4.  **File Scanning**:
     *   Iterates through files (ignoring `.git`, `node_modules`).
     *   Matches file content against `RuleRegistry` patterns.
-5.  **Advanced Scan (Privado)**:
-    *   If enabled, runs a Docker container (`privado/scan`) against the target directory.
-    *   Parses the JSON output and merges it with local violations.
+5.  **Advanced Deep Scan Pipeline**:
+    *   If enabled, runs a local pipeline powered by Microsoft Presidio and Semgrep against the target directory.
+    *   Parses the JSON output from these tools and merges it with local violations.
 6.  **Persistence**:
     *   Calls `_repo.SaveReportAsync` to wrap everything in a transaction and save to `Reports` and `Violations` tables.
 

@@ -83,15 +83,6 @@ namespace ComplianceSecurityAuditor.Controllers
                 return BadRequest(new { error = ex.Message });
             }
 
-            if (request.IsAdvanced)
-            {
-                var isDockerRunning = await Utility.IsDockerRunningAsync();
-                if (!isDockerRunning)
-                {
-                     return BadRequest(new { error = "Advanced scan requires Docker to be running. Please start Docker Desktop." });
-                }
-            }
-
             var jobId = Guid.NewGuid().ToString("N");
             var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunLocalScan(jobId, userId, path, request.IsAdvanced, null));
             await _progressRepo.StartAsync(jobId, userId, "Queued", hangId);
@@ -143,15 +134,6 @@ namespace ComplianceSecurityAuditor.Controllers
                     using (var stream = new FileStream(fullPath, FileMode.Create))
                     {
                         await file.CopyToAsync(stream);
-                    }
-                }
-
-                if (isAdvanced)
-                {
-                    var isDockerRunning = await Utility.IsDockerRunningAsync();
-                    if (!isDockerRunning)
-                    {
-                        return BadRequest(new { error = "Advanced scan requires Docker to be running. Please start Docker Desktop." });
                     }
                 }
 
@@ -525,15 +507,6 @@ namespace ComplianceSecurityAuditor.Controllers
                 return BadRequest(new { error = ex.Message });
             }
 
-            if (request.IsAdvanced)
-            {
-                var isDockerRunning = await Utility.IsDockerRunningAsync();
-                if (!isDockerRunning)
-                {
-                     return BadRequest(new { error = "Advanced scan requires Docker to be running. Please start Docker Desktop." });
-                }
-            }
-
             var jobId = Guid.NewGuid().ToString("N");
             // Pass null for accessToken to ScanJobService as well
             var hangId = BackgroundJob.Enqueue<ScanJobService>(svc => svc.RunGitScan(jobId, userId, request.RepositoryUrl, request.Branch, null, request.IsAdvanced, null));
@@ -615,9 +588,9 @@ namespace ComplianceSecurityAuditor.Controllers
                     {
                         var proc = System.Diagnostics.Process.GetProcessById(processId.Value);
                         // Security check: Verify process name to avoid killing random system processes
-                        // Privado CLI or Docker
+                        // Limit to tools used by advanced scanning and git operations
                         var procName = proc.ProcessName.ToLower();
-                        if (procName.Contains("privado") || procName.Contains("docker") || procName.Contains("git"))
+                        if (procName.Contains("python") || procName.Contains("semgrep") || procName.Contains("git"))
                         {
                             proc.Kill(true); // Kill entire process tree
                             Console.WriteLine($"[ScanController] Hard killed process {processId.Value} ({procName}) for job {jobId}");

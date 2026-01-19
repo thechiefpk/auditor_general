@@ -8,6 +8,7 @@ namespace ComplianceSecurityAuditor.Models
         public int LineNumber { get; set; }
         public string MatchedText { get; set; }
         public AuditRule ViolatedRule { get; set; }
+        public string Engine { get; set; } = "Custom";
 
         public Violation() { }
 
@@ -17,6 +18,7 @@ namespace ComplianceSecurityAuditor.Models
             LineNumber = lineNumber;
             MatchedText = matchedText;
             ViolatedRule = violatedRule;
+            Engine = "Custom";
         }
     }
 }

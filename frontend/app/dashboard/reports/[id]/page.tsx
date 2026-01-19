@@ -20,6 +20,7 @@ interface Violation {
   lineNumber: number;
   matchedText: string;
   violatedRule: AuditRule;
+  engine?: string;
 }
 
 interface ScanReport {
@@ -352,9 +353,16 @@ export default function ReportDetailsPage() {
                     {violation.violatedRule.name}
                     </h3>
                 </div>
-                <span className="text-sm font-mono text-zinc-400 bg-black px-2 py-1 rounded border border-zinc-800">
-                    Line {violation.lineNumber}
-                </span>
+                <div className="flex items-center gap-2">
+                    {violation.engine && (
+                      <span className="text-xs font-medium text-emerald-300 bg-emerald-900/40 px-2 py-1 rounded-full border border-emerald-700">
+                        {violation.engine}
+                      </span>
+                    )}
+                    <span className="text-sm font-mono text-zinc-400 bg-black px-2 py-1 rounded border border-zinc-800">
+                      Line {violation.lineNumber}
+                    </span>
+                </div>
                 </div>
                 
                 <p className="text-zinc-300 text-sm mb-4">

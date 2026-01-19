@@ -61,8 +61,8 @@ builder.Services.AddSingleton<IScheduleRepository>(new SqlScheduleRepository(con
 
 // register ComplianceService with repo
 builder.Services.AddScoped<ComplianceService>(sp => new ComplianceService(sp.GetService<ISqlReportRepository>()));
-builder.Services.AddScoped<PrivadoScanner>();
 builder.Services.AddScoped<SqlScanner>();
+builder.Services.AddScoped<AdvancedScanPipeline>();
 builder.Services.AddScoped<ScanJobService>();
 builder.Services.AddScoped<PdfReportService>();
 builder.Services.AddScoped<NetworkAuditService>();

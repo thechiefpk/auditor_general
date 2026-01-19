@@ -75,7 +75,7 @@ The project follows a **decoupled Client-Server architecture**, ensuring scalabi
     *   PII (SSN, Email, Phone Numbers)
 2.  **Hybrid Scanning Approach**:
     *   **Native Scanning**: Fast, in-memory scanning for text files.
-    *   **Docker Integration**: The system orchestrates Docker containers to run advanced third-party tools (like Privado) for deep code analysis, parsing their JSON output and normalizing it into a unified report format.
+    *   **Advanced Deep Scan Pipeline**: The system can run local advanced analysis using Microsoft Presidio and Semgrep for deep code and data-flow analysis, parsing their JSON output and normalizing it into a unified report format.
 3.  **Authentication**: Secure **JWT (JSON Web Token)** implementation with HTTP-only cookies ensures session security.
 
 ### 4.3 Architecture Diagram
@@ -91,7 +91,6 @@ graph TD
         Services -->|CRUD| DB[(SQL Server)]
         HF -->|Async Execution| ScanEngine[Scan Logic / Validation Engine]
         ScanEngine -->|Updates| DB
-        ScanEngine -->|Docker CLI| Privado[Privado Scanner (Docker)]
     end
 ```
 

@@ -55,14 +55,14 @@ for ($i = 0; $i -lt $maxRetries; $i++) {
     # We'll use sqlcmd for verification
     $query = "SELECT ProcessId FROM dbo.ScanProgress WHERE JobId='$jobId'"
     # Note: This is a bit tricky to capture in PS variable via Invoke-Sqlcmd if not installed, 
-    # so we'll just check if the progress stage changes to "Deep Scan" which implies Privado started.
+    # so we'll just check if the progress stage changes to "Deep Scan" which implies the advanced pipeline started.
     
     try {
         $progress = Invoke-RestMethod -Uri "$baseUrl/scan/progress/$jobId" -Headers $headers
         Write-Host "Status: $($progress.status), Stage: $($progress.stage)"
         
-        if ($progress.status -eq "Deep Scan" -or $progress.stage -like "*Privado*" -or $progress.stage -like "*Deep Scan*") {
-            Write-Host "Privado scan appears to be running (Status: $($progress.status))."
+        if ($progress.status -eq "Deep Scan" -or $progress.stage -like "*Deep Scan*") {
+            Write-Host "Advanced scan appears to be running (Status: $($progress.status))."
             break
         }
     } catch {

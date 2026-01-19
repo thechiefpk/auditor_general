@@ -10,6 +10,48 @@ namespace ComplianceSecurityAuditor.Controllers
     [Route("api/system")]
     public class SystemController : ControllerBase
     {
+        [HttpGet("env-check")]
+        public async Task<IActionResult> GetEnvironmentStatus()
+        {
+            try
+            {
+                // Check for Python (prefer 3.12 via py launcher)
+                var pythonOk = await TryRunAsync("py", "-3.12 --version");
+                if (!pythonOk)
+                {
+                    pythonOk = await TryRunAsync("python", "--version");
+                }
+
+                // Check Presidio (prefer 3.12 via py launcher)
+                var presidioOk = await TryRunAsync("py", "-3.12 -c \"import presidio_analyzer\"");
+                if (!presidioOk)
+                {
+                    presidioOk = await TryRunAsync("python", "-c \"import presidio_analyzer\"");
+                }
+
+                var semgrepOk = await TryRunAsync("semgrep", "--version");
+                if (!semgrepOk)
+                {
+                    var fallbackPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "Python",
+                        "Python314",
+                        "Scripts",
+                        "semgrep.exe");
+                    if (System.IO.File.Exists(fallbackPath))
+                    {
+                        semgrepOk = await TryRunAsync(fallbackPath, "--version");
+                    }
+                }
+
+                return Ok(new { python = pythonOk, presidio = presidioOk, semgrep = semgrepOk });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
         [HttpPost("browse")]
         public IActionResult BrowseFileSystem([FromBody] BrowseRequest request)
         {
@@ -120,6 +162,31 @@ namespace ComplianceSecurityAuditor.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        private static async Task<bool> TryRunAsync(string fileName, string arguments)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = Process.Start(psi);
+                if (process == null) return false;
+                await process.WaitForExitAsync();
+                return process.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
             }
         }
 

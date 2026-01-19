@@ -115,47 +115,6 @@ export default function ScanPage() {
     }
     return () => clearInterval(interval);
   }, [isScanning, startTime]);
-  
-  // Docker state
-  const [isDockerRunning, setIsDockerRunning] = useState(false);
-
-  // Check and start Docker on mount
-  useEffect(() => {
-    const checkAndStartDocker = async () => {
-        try {
-            const res = await fetch(API_ENDPOINTS.SYSTEM_DOCKER_STATUS);
-            if (!res.ok) return;
-            const data = await res.json();
-            
-            if (data.isRunning) {
-                setIsDockerRunning(true);
-            } else {
-                setIsDockerRunning(false);
-                // Silent start
-                const startRes = await fetch(API_ENDPOINTS.SYSTEM_START_DOCKER, { method: 'POST' });
-                if (startRes.ok) {
-                    // Poll for status until running
-                    const interval = setInterval(async () => {
-                        try {
-                            const pollRes = await fetch(API_ENDPOINTS.SYSTEM_DOCKER_STATUS);
-                            const pollData = await pollRes.json();
-                            if (pollData.isRunning) {
-                                setIsDockerRunning(true);
-                                clearInterval(interval);
-                            }
-                        } catch {
-                            // ignore poll errors
-                        }
-                    }, 3000);
-                }
-            }
-        } catch (e) {
-            console.error("Failed to check docker status", e);
-        }
-    };
-
-    checkAndStartDocker();
-  }, []);
 
   // Dynamic storage key based on user
   const getJobStorageKey = () => user?.username ? `scanJobId_${user.username}` : 'currentScanJobId';
@@ -308,12 +267,6 @@ export default function ScanPage() {
       return;
     }
 
-    if (selectedScanType === 'advanced' && !isDockerRunning) {
-        toast.error('Docker is not running. Cannot start advanced scan.');
-        fetch(API_ENDPOINTS.SYSTEM_START_DOCKER, { method: 'POST' });
-        return;
-    }
-
     setIsConsentOpen(true);
   };
 
@@ -410,7 +363,6 @@ export default function ScanPage() {
 
   const renderTiles = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-      {/* Local Scan Tile */}
       <button
         onClick={() => setSelectedScanType('local')}
         disabled={isScanning}
@@ -421,41 +373,22 @@ export default function ScanPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
           </svg>
         </div>
-        <h3 className="text-xl font-semibold text-white mb-2">Local Scan</h3>
-        <p className="text-zinc-400 text-sm">Scan a local directory on the server for compliance and security issues.</p>
+        <h3 className="text-xl font-semibold text-white mb-2">Basic Scan</h3>
+        <p className="text-zinc-400 text-sm">Scan a local path or Git repository for compliance and security issues.</p>
       </button>
 
-      {/* Git Scan Tile */}
-      <button
-        onClick={() => setSelectedScanType('git')}
-        disabled={isScanning}
-        className="flex flex-col items-start p-6 bg-zinc-900/40 backdrop-blur-sm border border-zinc-800 rounded-xl hover:bg-zinc-800/40 hover:border-zinc-700 transition-all text-left group"
-      >
-        <div className="p-3 bg-purple-500/10 rounded-lg mb-4 group-hover:bg-purple-500/20 transition-colors">
-          <svg className="w-8 h-8 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-          </svg>
-        </div>
-        <h3 className="text-xl font-semibold text-white mb-2">Git Repository Scan</h3>
-        <p className="text-zinc-400 text-sm">Clone and scan a remote Git repository directly from the source.</p>
-      </button>
-
-      {/* Advanced Scan Tile */}
       <button
         onClick={() => setSelectedScanType('advanced')}
         disabled={isScanning}
         className="flex flex-col items-start p-6 bg-zinc-900/40 backdrop-blur-sm border border-amber-500/20 rounded-xl hover:bg-amber-500/10 hover:border-amber-500/40 transition-all text-left group relative overflow-hidden"
       >
-        <div className="absolute top-0 right-0 p-2">
-            <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded border border-amber-500/20">Deep Scan</span>
-        </div>
         <div className="p-3 bg-amber-500/10 rounded-lg mb-4 group-hover:bg-amber-500/20 transition-colors">
           <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
         </div>
         <h3 className="text-xl font-semibold text-white mb-2">Advanced Deep Scan</h3>
-        <p className="text-zinc-400 text-sm">Uses a 3rd party engine to detect complex data flow and privacy vulnerabilities.</p>
+        <p className="text-zinc-400 text-sm">Runs enhanced analysis using Microsoft Presidio and Semgrep for privacy and security issues.</p>
       </button>
 
     </div>
@@ -487,6 +420,27 @@ export default function ScanPage() {
         </div>
 
         <form onSubmit={initiateScan} className="space-y-6">
+            
+            {!isAdvanced && (
+                <div className="flex p-1 bg-zinc-800 rounded-lg w-fit mb-6">
+                    <button
+                        type="button"
+                        onClick={() => setSelectedScanType('local')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${isLocal ? 'bg-zinc-600 text-white shadow' : 'text-zinc-400 hover:text-white'}`}
+                        disabled={isScanning}
+                    >
+                        Local Path
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSelectedScanType('git')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${isGit ? 'bg-zinc-600 text-white shadow' : 'text-zinc-400 hover:text-white'}`}
+                        disabled={isScanning}
+                    >
+                        Git Repository
+                    </button>
+                </div>
+            )}
             
             {/* Advanced Scan Type Selector */}
             {isAdvanced && (
@@ -676,9 +630,9 @@ export default function ScanPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div>
-                        <p className="text-amber-200 font-medium">3rd Party Processing</p>
+                        <p className="text-amber-200 font-medium">Advanced Pipeline</p>
                         <p className="text-amber-500/80 text-sm mt-1">
-                            This scan utilizes a powerful 3rd party analysis engine. Your code will be processed by an external service for deep data flow analysis.
+                            This scan runs a pipeline of specialized tools for PII and static analysis. Your code is analyzed locally using Microsoft Presidio and Semgrep, subject to these tools being installed and available on the server.
                         </p>
                     </div>
                  </div>

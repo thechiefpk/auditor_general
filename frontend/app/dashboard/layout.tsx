@@ -4,8 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { API_ENDPOINTS } from '@/app/lib/api';
-import toast from 'react-hot-toast';
 
 export default function DashboardLayout({
   children,
@@ -24,39 +22,6 @@ export default function DashboardLayout({
       router.push('/login');
     }
   }, [user, isLoading, router]);
-
-  // Check and start Docker on mount (Login/Dashboard load)
-  useEffect(() => {
-    const checkAndStartDocker = async () => {
-        if (!user) return;
-        try {
-            const res = await fetch(API_ENDPOINTS.SYSTEM_DOCKER_STATUS);
-            if (!res.ok) return;
-            const data = await res.json();
-            
-            if (!data.isRunning) {
-                // Silent start
-                const startRes = await fetch(API_ENDPOINTS.SYSTEM_START_DOCKER, { method: 'POST' });
-                
-                if (startRes.ok) {
-                    const interval = setInterval(async () => {
-                        try {
-                            const pollRes = await fetch(API_ENDPOINTS.SYSTEM_DOCKER_STATUS);
-                            const pollData = await pollRes.json();
-                            if (pollData.isRunning) {
-                                clearInterval(interval);
-                            }
-                        } catch {}
-                    }, 3000);
-                }
-            }
-        } catch (e) {
-            console.error("Failed to check docker status", e);
-        }
-    };
-
-    checkAndStartDocker();
-  }, [user]);
 
   // Close profile dropdown when clicking outside
   useEffect(() => {

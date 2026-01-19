@@ -12,7 +12,7 @@
 
 ## Abstract
 
-In the era of rapid software development and increasing cyber threats, the integration of security into the DevOps lifecycle—commonly known as DevSecOps—has become imperative. Traditional security auditing methods, often characterized by manual reviews and periodic scans, fail to keep pace with the velocity of modern Continuous Integration/Continuous Deployment (CI/CD) pipelines. This project presents **SecureSoft Compliance Auditor**, a unified, automated security platform designed to bridge this gap. The system leverages a decoupled architecture comprising a high-performance .NET 8 Web API backend and a responsive Next.js 14 frontend. It features a hybrid scanning engine that combines a custom Regex-based validator for immediate feedback with containerized enterprise-grade tools (Privado) for deep code analysis. Key capabilities include real-time progress monitoring, automated report generation (PDF), and compliance mapping to standards such as GDPR and HIPAA. Experimental results demonstrate that the platform significantly reduces the time required for vulnerability detection compared to manual methods, offering a scalable and user-friendly solution for organizations aiming to enhance their security posture without compromising development speed.
+In the era of rapid software development and increasing cyber threats, the integration of security into the DevOps lifecycle—commonly known as DevSecOps—has become imperative. Traditional security auditing methods, often characterized by manual reviews and periodic scans, fail to keep pace with the velocity of modern Continuous Integration/Continuous Deployment (CI/CD) pipelines. This project presents **SecureSoft Compliance Auditor**, a unified, automated security platform designed to bridge this gap. The system leverages a decoupled architecture comprising a high-performance .NET 8 Web API backend and a responsive Next.js 14 frontend. It features a hybrid scanning engine that combines a custom Regex-based validator for immediate feedback with advanced local analysis tools (Microsoft Presidio and Semgrep) for deep code and data-flow analysis. Key capabilities include real-time progress monitoring, automated report generation (PDF), and compliance mapping to standards such as GDPR and HIPAA. Experimental results demonstrate that the platform significantly reduces the time required for vulnerability detection compared to manual methods, offering a scalable and user-friendly solution for organizations aiming to enhance their security posture without compromising development speed.
 
 ---
 
@@ -130,7 +130,7 @@ graph TD
 
     subgraph "Execution Layer"
         Engine[Validation Engine]
-        Docker[Docker Container (Privado)]
+        AdvScan[Advanced Scan Pipeline (Presidio + Semgrep)]
     end
 
     Browser -->|HTTPS| NextJS
@@ -217,7 +217,7 @@ SecureSoft uses a stateless authentication mechanism. Upon login, the server val
 #### 5.1.2 The Hybrid Scan Engine
 The core innovation is the hybrid engine:
 1.  **Fast Path (Regex)**: For immediate detection of simple patterns (e.g., Email addresses, IP addresses).
-2.  **Slow Path (AST/Docker)**: For complex logic (e.g., Data Flow Analysis). The system spawns a Docker container running `privado` or `semgrep`, mounts the target volume, runs the scan, and parses the JSON output.
+2.  **Advanced Deep Scan Path**: For complex logic (e.g., Data Flow and PII Analysis). The system runs a local advanced scan pipeline powered by Microsoft Presidio and Semgrep, executes the tools against the target volume, and parses their JSON output.
 
 ### 5.2 Algorithms Used
 

@@ -16,6 +16,7 @@ namespace SecureSoftAPI.Data
 		{
 			_connectionString = connectionString;
             EnsureNetworkTableExists();
+            EnsureViolationsEngineColumn();
 		}
 
         private void EnsureNetworkTableExists()
@@ -41,6 +42,27 @@ namespace SecureSoftAPI.Data
             catch (Exception ex)
             {
                 Console.WriteLine($"Error creating NetworkAudits table: {ex.Message}");
+            }
+        }
+
+        private void EnsureViolationsEngineColumn()
+        {
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                var cmd = new SqlCommand(@"
+                    IF NOT EXISTS (
+                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = 'Violations' AND COLUMN_NAME = 'Engine'
+                    )
+                    ALTER TABLE Violations ADD Engine NVARCHAR(50) NULL
+                ", conn);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error ensuring Engine column on Violations table: " + ex.Message);
             }
         }
 
@@ -114,8 +136,8 @@ VALUES(@UserId, @Path, @FilesScanned, @ViolationsFound, @CreatedAt)", conn, tran
 				// --- No changes needed for violations ---
 				foreach (var v in summary.Violations)
 				{
-					var vcmd = new SqlCommand(@"INSERT INTO Violations(ReportId, FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Description, Severity, Remediation, ReferenceUrl)
-VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Category, @Description, @Severity, @Remediation, @ReferenceUrl)", conn, tran);
+					var vcmd = new SqlCommand(@"INSERT INTO Violations(ReportId, FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Description, Severity, Remediation, ReferenceUrl, Engine)
+VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Category, @Description, @Severity, @Remediation, @ReferenceUrl, @Engine)", conn, tran);
 					vcmd.Parameters.AddWithValue("@ReportId", id);
 					vcmd.Parameters.AddWithValue("@FilePath", v.FilePath);
 					vcmd.Parameters.AddWithValue("@LineNumber", v.LineNumber);
@@ -127,6 +149,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 					vcmd.Parameters.AddWithValue("@Severity", v.ViolatedRule.Severity.ToString());
 					vcmd.Parameters.AddWithValue("@Remediation", v.ViolatedRule.Remediation ?? (object)DBNull.Value);
 					vcmd.Parameters.AddWithValue("@ReferenceUrl", v.ViolatedRule.ReferenceUrl ?? (object)DBNull.Value);
+					vcmd.Parameters.AddWithValue("@Engine", v.Engine ?? (object)DBNull.Value);
 					await vcmd.ExecuteNonQueryAsync();
 				}
 
@@ -285,7 +308,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 			await reader.CloseAsync();
 
 			// Read violations
-			var vcmd = new SqlCommand("SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description FROM Violations WHERE ReportId = @Id ORDER BY FilePath, LineNumber", conn);
+			var vcmd = new SqlCommand("SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description, Engine FROM Violations WHERE ReportId = @Id ORDER BY FilePath, LineNumber", conn);
 			vcmd.Parameters.AddWithValue("@Id", reportId);
 			using var vreader = await vcmd.ExecuteReaderAsync();
 			while (await vreader.ReadAsync())
@@ -301,9 +324,11 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 				var remediation = vreader.IsDBNull(7) ? string.Empty : vreader.GetString(7);
 				var refUrl = vreader.IsDBNull(8) ? null : vreader.GetString(8);
 				var description = vreader.IsDBNull(9) ? string.Empty : vreader.GetString(9);
+				var engine = vreader.IsDBNull(10) ? "Custom" : vreader.GetString(10);
 
 				var rule = new AuditRule(ruleId, ruleName, category, description, severity, remediation, refUrl, null!);
 				var violation = new Violation(file, line, matched, rule);
+				violation.Engine = engine;
 				summary.Violations.Add(violation);
 			}
 
@@ -351,7 +376,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 			};
 			var dir = sortDir?.ToLowerInvariant() == "desc" ? "DESC" : "ASC";
 
-			var qText = $@"SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description FROM Violations {where} ORDER BY {safeSort} {dir} OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+			var qText = $@"SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description, Engine FROM Violations {where} ORDER BY {safeSort} {dir} OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 			var fetchCmd = new SqlCommand(qText, conn);
 			foreach (SqlParameter p in cmd.Parameters) fetchCmd.Parameters.Add(p.ParameterName, p.SqlDbType).Value = p.Value;
 			fetchCmd.Parameters.AddWithValue("@Offset", offset);
@@ -371,9 +396,11 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 				var remediation = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
 				var refUrl = reader.IsDBNull(8) ? null : reader.GetString(8);
 				var description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9);
+				var engine = reader.IsDBNull(10) ? "Custom" : reader.GetString(10);
 
 				var rule = new AuditRule(ruleId, ruleName, fileCategory, description, severity, remediation, refUrl, null!);
 				var violation = new Violation(file, line, matched, rule);
+				violation.Engine = engine;
 				result.Items.Add(violation);
 			}
 
@@ -425,7 +452,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 
 			// Fetch violations for all reportIds in one query
 			var idsParam = string.Join(",", reportIds.Select((_, idx) => "@id" + idx));
-			var vcmdText = $@"SELECT ReportId, FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description
+			var vcmdText = $@"SELECT ReportId, FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description, Engine
 							  FROM Violations
 							  WHERE ReportId IN ({idsParam})
 							  ORDER BY ReportId, FilePath, LineNumber";
@@ -452,9 +479,11 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
 				var remediation = vreader.IsDBNull(8) ? string.Empty : vreader.GetString(8);
 				var refUrl = vreader.IsDBNull(9) ? null : vreader.GetString(9);
 				var description = vreader.IsDBNull(10) ? string.Empty : vreader.GetString(10);
+				var engine = vreader.IsDBNull(11) ? "Custom" : vreader.GetString(11);
 
 				var rule = new AuditRule(ruleId, ruleName, category, description, severity, remediation, refUrl, null!);
 				var violation = new Violation(file, line, matched, rule);
+				violation.Engine = engine;
 
 				if (!violationsByReport.TryGetValue(rid, out var listFor))
 				{
@@ -502,7 +531,7 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
             await conn.OpenAsync();
 
             var list = new List<Violation>();
-            var vcmd = new SqlCommand("SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description FROM Violations WHERE ReportId = @Id ORDER BY FilePath, LineNumber", conn);
+            var vcmd = new SqlCommand("SELECT FilePath, LineNumber, MatchedText, RuleId, RuleName, Category, Severity, Remediation, ReferenceUrl, Description, Engine FROM Violations WHERE ReportId = @Id ORDER BY FilePath, LineNumber", conn);
             vcmd.Parameters.AddWithValue("@Id", reportId);
             using var vreader = await vcmd.ExecuteReaderAsync();
             while (await vreader.ReadAsync())
@@ -518,9 +547,11 @@ VALUES(@ReportId, @FilePath, @LineNumber, @MatchedText, @RuleId, @RuleName, @Cat
                 var remediation = vreader.IsDBNull(7) ? string.Empty : vreader.GetString(7);
                 var refUrl = vreader.IsDBNull(8) ? null : vreader.GetString(8);
                 var description = vreader.IsDBNull(9) ? string.Empty : vreader.GetString(9);
+                var engine = vreader.IsDBNull(10) ? "Custom" : vreader.GetString(10);
 
                 var rule = new AuditRule(ruleId, ruleName, category, description, severity, remediation, refUrl, null!);
                 var violation = new Violation(file, line, matched, rule);
+                violation.Engine = engine;
                 list.Add(violation);
             }
             return list;

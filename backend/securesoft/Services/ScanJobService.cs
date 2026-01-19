@@ -11,19 +11,19 @@ namespace ComplianceSecurityAuditor.Services
         private readonly ISqlReportRepository _repo;
         private readonly IScanProgressRepository _progress;
         private readonly IScheduleRepository _scheduleRepo;
-        private readonly PrivadoScanner _privado;
         private readonly SqlScanner _sqlScanner;
         private readonly NetworkAuditService _networkAuditService;
+        private readonly AdvancedScanPipeline _advancedPipeline;
 
-        public ScanJobService(ComplianceService compliance, ISqlReportRepository repo, IScanProgressRepository progress, IScheduleRepository scheduleRepo, PrivadoScanner privado, SqlScanner sqlScanner, NetworkAuditService networkAuditService)
+        public ScanJobService(ComplianceService compliance, ISqlReportRepository repo, IScanProgressRepository progress, IScheduleRepository scheduleRepo, SqlScanner sqlScanner, NetworkAuditService networkAuditService, AdvancedScanPipeline advancedPipeline)
         {
             _compliance = compliance;
             _repo = repo;
             _progress = progress;
             _scheduleRepo = scheduleRepo;
-            _privado = privado;
             _sqlScanner = sqlScanner;
             _networkAuditService = networkAuditService;
+            _advancedPipeline = advancedPipeline;
         }
 
         public async Task RunNetworkScan(string jobId, Guid userId, string target, Guid? scheduleId = null)
@@ -78,16 +78,36 @@ namespace ComplianceSecurityAuditor.Services
         {
             try
             {
-                var summary = await _compliance.ScanWithProgressAsync(userId, path, _progress, jobId);
-
                 if (isAdvanced)
                 {
-                    await _progress.UpdateAsync(jobId, "Deep Scan", "Running Advanced Analysis (3rd Party)...", 0, 0, 0, 0);
-                    var privadoViolations = await _privado.RunScanAsync(path, jobId);
-                    summary.Violations.AddRange(privadoViolations);
-                    summary.ViolationsFound += privadoViolations.Count;
+                    await _progress.UpdateAsync(jobId, "Deep Scan", "Running Advanced Analysis Pipeline...", 0, 0, 0, 0);
+                    var advancedSummary = await _advancedPipeline.RunAsync(userId, path, jobId);
+                    var advancedReportId = await _repo.SaveReportAsync(userId, path, advancedSummary);
+                    var advancedCancelRequested = await _progress.IsCancelRequestedAsync(jobId);
+                    if (advancedCancelRequested)
+                    {
+                        await _progress.MarkCancelledAsync(jobId, advancedReportId);
+                    }
+                    else
+                    {
+                        await _progress.CompleteAsync(jobId, advancedReportId);
+                        if (scheduleId.HasValue)
+                        {
+                            await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                            {
+                                Id = Guid.NewGuid(),
+                                ScheduleId = scheduleId.Value,
+                                ExecutedAt = DateTime.UtcNow,
+                                Status = "Success",
+                                ResultSummary = advancedReportId.ToString()
+                            });
+                            await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                        }
+                    }
+                    return;
                 }
 
+                var summary = await _compliance.ScanWithProgressAsync(userId, path, _progress, jobId);
                 var reportId = await _repo.SaveReportAsync(userId, path, summary);
                 var cancelRequested = await _progress.IsCancelRequestedAsync(jobId);
                 if (cancelRequested)
@@ -169,45 +189,61 @@ namespace ComplianceSecurityAuditor.Services
                      return;
                 }
 
-                await _progress.UpdateAsync(jobId, "Scanning", "Scanning Files...", 0, 0, 0, 0);
-                
-                // Pass a cancellation token source linked to a timeout for scanning activity
-                // But since ScanWithProgressAsync manages its own loop, we'll rely on it updating 'UpdatedAt' frequently.
-                // The GetProgress endpoint handles the passive timeout (if the job dies).
-                // Here we just ensure we respect the user cancellation.
-                
-                var summary = await _compliance.ScanWithProgressAsync(userId, tempDirectory, _progress, jobId);
-                summary.RepositoryUrl = repoUrl;
-                summary.Branch = branch ?? "default";
-
                 if (isAdvanced)
                 {
-                    await _progress.UpdateAsync(jobId, "Deep Scan", "Running Advanced Analysis (3rd Party)...", 0, 0, 0, 0);
-                    var privadoViolations = await _privado.RunScanAsync(tempDirectory, jobId);
-                    summary.Violations.AddRange(privadoViolations);
-                    summary.ViolationsFound += privadoViolations.Count;
-                }
-
-                var reportId = await _repo.SaveReportAsync(userId, tempDirectory, summary);
-                var cancelRequested = await _progress.IsCancelRequestedAsync(jobId);
-                if (cancelRequested)
-                {
-                    await _progress.MarkCancelledAsync(jobId, reportId);
+                    await _progress.UpdateAsync(jobId, "Deep Scan", "Running Advanced Analysis Pipeline...", 0, 0, 0, 0);
+                    var advancedSummary = await _advancedPipeline.RunAsync(userId, tempDirectory, jobId, repoUrl, branch ?? "default");
+                    var advancedReportId = await _repo.SaveReportAsync(userId, tempDirectory, advancedSummary);
+                    var advancedCancelRequested = await _progress.IsCancelRequestedAsync(jobId);
+                    if (advancedCancelRequested)
+                    {
+                        await _progress.MarkCancelledAsync(jobId, advancedReportId);
+                    }
+                    else
+                    {
+                        await _progress.CompleteAsync(jobId, advancedReportId);
+                        if (scheduleId.HasValue)
+                        {
+                            await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                            {
+                                Id = Guid.NewGuid(),
+                                ScheduleId = scheduleId.Value,
+                                ExecutedAt = DateTime.UtcNow,
+                                Status = "Success",
+                                ResultSummary = advancedReportId.ToString()
+                            });
+                            await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                        }
+                    }
                 }
                 else
                 {
-                    await _progress.CompleteAsync(jobId, reportId);
-                    if (scheduleId.HasValue)
+                    await _progress.UpdateAsync(jobId, "Scanning", "Scanning Files...", 0, 0, 0, 0);
+                    var summary = await _compliance.ScanWithProgressAsync(userId, tempDirectory, _progress, jobId);
+                    summary.RepositoryUrl = repoUrl;
+                    summary.Branch = branch ?? "default";
+
+                    var reportId = await _repo.SaveReportAsync(userId, tempDirectory, summary);
+                    var cancelRequested = await _progress.IsCancelRequestedAsync(jobId);
+                    if (cancelRequested)
                     {
-                        await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                        await _progress.MarkCancelledAsync(jobId, reportId);
+                    }
+                    else
+                    {
+                        await _progress.CompleteAsync(jobId, reportId);
+                        if (scheduleId.HasValue)
                         {
-                            Id = Guid.NewGuid(),
-                            ScheduleId = scheduleId.Value,
-                            ExecutedAt = DateTime.UtcNow,
-                            Status = "Success",
-                            ResultSummary = reportId.ToString()
-                        });
-                        await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                            await _scheduleRepo.AddExecutionHistoryAsync(new ScanExecutionHistory
+                            {
+                                Id = Guid.NewGuid(),
+                                ScheduleId = scheduleId.Value,
+                                ExecutedAt = DateTime.UtcNow,
+                                Status = "Success",
+                                ResultSummary = reportId.ToString()
+                            });
+                            await _scheduleRepo.UpdateLastRunAsync(scheduleId.Value, DateTime.UtcNow);
+                        }
                     }
                 }
             }
